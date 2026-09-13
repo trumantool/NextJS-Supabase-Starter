@@ -1063,6 +1063,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.app_settings TO service_role;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.todo_list TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.todo_list TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.todo_list_id_seq TO authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.todo_list_id_seq TO service_role;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_files TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_files TO service_role;
