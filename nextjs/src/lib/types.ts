@@ -783,3 +783,6 @@ export type AutomationRun = Database['public']['Tables']['automation_runs']['Row
 export type AgentSkill = Database['public']['Tables']['agent_skills']['Row']
 export type AgentTemplate = Database['public']['Tables']['agent_templates']['Row']
 export type UserAgent = Database['public']['Tables']['user_agents']['Row']
+export type Chat = Database['public']['Tables']['chats']['Row']
+export type Message = Database['public']['Tables']['messages']['Row']
+export type SessionTag = Database['public']['Tables']['session_tags']['Row']

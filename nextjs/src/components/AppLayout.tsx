@@ -9,7 +9,7 @@ import {
     X,
     ChevronDown,
     LogOut,
-    Key,     Files, LucideListTodo, FileText, Settings, ShieldCheck, Bot, BookOpen, LayoutTemplate,
+    Key,     Files, LucideListTodo, FileText, Settings, ShieldCheck, Bot, BookOpen, LayoutTemplate, MessageSquare,
 } from 'lucide-react';
 import { useGlobal } from "@/lib/context/GlobalContext";
 import { createSPASassClient } from "@/lib/supabase/client";
@@ -45,12 +45,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     const productName = process.env.NEXT_PUBLIC_PRODUCTNAME;
 
-    // Phase 4: Agents / Skills / Templates. Chat + automations land in Phases 5–6.
     const navigation = [
         { name: 'Home', href: '/dashboard', icon: Home },
         { name: 'Documents', href: '/documents', icon: FileText },
         { name: 'My Files', href: '/storage', icon: Files },
         { name: 'To Do', href: '/todos', icon: LucideListTodo },
+        { name: 'Chat', href: '/chat', icon: MessageSquare },
         { name: 'Agents', href: '/agents', icon: Bot },
         { name: 'Skills', href: '/agent-skills', icon: BookOpen },
         { name: 'Templates', href: '/agent-templates', icon: LayoutTemplate },

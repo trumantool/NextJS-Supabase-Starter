@@ -9,6 +9,7 @@ import {
   Settings,
   ShieldCheck,
   Bot,
+  MessageSquare,
 } from 'lucide-react';
 import AuthAwareButtons from '@/components/AuthAwareButtons';
 import HomePricing from "@/components/HomePricing";
@@ -61,9 +62,17 @@ export default function Home() {
       icon: Bot,
       title: 'Agents and skills',
       description:
-        'Upload skill markdown, browse a generic starter template, and clone user agents. Chat ships later.',
+        'Upload skill markdown, browse a generic starter template, and clone user agents.',
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',
+    },
+    {
+      icon: MessageSquare,
+      title: 'AI chat',
+      description:
+        'Multi-turn OpenRouter chat with an agent switcher, skill context, and file attachments.',
+      color: 'text-sky-600',
+      bg: 'bg-sky-50',
     },
     {
       icon: Settings,
@@ -86,7 +95,7 @@ export default function Home() {
       number: '02',
       title: 'Sign in',
       description:
-        'Register, optionally enable MFA, then use Files, To Do, Documents, and Agents.',
+        'Register, optionally enable MFA, then use Files, To Do, Documents, Chat, and Agents.',
     },
     {
       number: '03',
