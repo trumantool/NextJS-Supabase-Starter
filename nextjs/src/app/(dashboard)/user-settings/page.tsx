@@ -6,6 +6,7 @@ import { useGlobal } from '@/lib/context/GlobalContext';
 import { createSPASassClientAuthenticated as createSPASassClient } from '@/lib/supabase/client';
 import { Key, User, CheckCircle } from 'lucide-react';
 import { MFASetup } from '@/components/MFASetup';
+import { ByokSettingsCard } from '@/components/ByokSettingsCard';
 
 export default function UserSettingsPage() {
     const { user } = useGlobal();
@@ -146,6 +147,8 @@ export default function UserSettingsPage() {
                             </form>
                         </CardContent>
                     </Card>
+
+                    <ByokSettingsCard />
 
                     <MFASetup
                         onStatusChange={() => {

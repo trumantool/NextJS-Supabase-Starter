@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Slim starter keep-only schema (Phase 1)
 -- ============================================================================
--- Consolidated view of supabase/migrations/20260913223000_slim_starter_baseline.sql.
+-- Consolidated view of supabase/migrations (baseline + later keep-set patches).
 -- Apply this file on a NEW empty Supabase project via SQL Editor, or prefer:
 --
 --   npx supabase db push --linked
@@ -1048,7 +1048,12 @@ USING (true) WITH CHECK (true);
 GRANT SELECT, UPDATE ON public.user_data TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_data TO service_role;
 
-GRANT SELECT, UPDATE ON public.user_settings TO authenticated;
+-- Profile fields are readable/updatable by the owner (RLS). The BYOK key
+-- column is service-role only — never granted to authenticated.
+GRANT SELECT (user_id, first_name, last_name, email, created_at, updated_at)
+  ON public.user_settings TO authenticated;
+GRANT UPDATE (first_name, last_name, email, updated_at)
+  ON public.user_settings TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_settings TO service_role;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_roles TO authenticated;

@@ -190,11 +190,11 @@ If Eng prefers minimal churn from current starter, keep existing `files` for My 
 - [ ] Verification: apply schema to a throwaway Supabase project; no errors; RLS smoke via anon/authenticated.
 
 ### Phase 2 — Keep surfaces harden (files, todos, settings)
-- [ ] Align Files UI with chosen bucket naming; keep upload/list/delete/signed URL.
-- [ ] Todos: ensure CRUD + RLS; optional rename `/table` → `/todos`.
-- [ ] User settings: add BYOK field + API pattern from marketing-agent (`/api/user/byok-key` or equivalent).
-- [ ] Admin: slim to site settings + openrouter model; drop submissions tab.
-- [ ] Strip public marketing/ReachThem copy to generic starter branding (`NEXT_PUBLIC_PRODUCTNAME`).
+- [x] Align Files UI with chosen bucket naming; keep upload/list/delete/signed URL.
+- [x] Todos: ensure CRUD + RLS; optional rename `/table` → `/todos`.
+- [x] User settings: add BYOK field + API pattern from marketing-agent (`/api/user/byok-key` or equivalent).
+- [x] Admin: slim to site settings + openrouter model; drop submissions tab.
+- [x] Strip public marketing/ReachThem copy to generic starter branding (`NEXT_PUBLIC_PRODUCTNAME`).
 
 ### Phase 3 — Documents generalization
 - [ ] Move `resume-builder` → `documents` routes/components (or alias then delete).

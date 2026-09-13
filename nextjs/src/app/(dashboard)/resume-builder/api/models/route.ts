@@ -1,5 +1,6 @@
 // Resume Builder — GET: OpenRouter model list (admin dropdown).
 import { NextResponse } from 'next/server'
+import { isCurrentUserAdmin } from '@/app/(dashboard)/admin/actions'
 import { createSSRClient } from '@/lib/supabase/server'
 import { listOpenRouterModels } from '../../lib/openrouter'
 import { getOpenRouterModel } from '../../lib/supabase-resumes'
@@ -14,6 +15,9 @@ export async function GET() {
     } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (!(await isCurrentUserAdmin())) {
+      return NextResponse.json({ error: 'Forbidden: admin access required' }, { status: 403 })
     }
 
     const [models, current] = await Promise.all([

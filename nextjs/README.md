@@ -17,4 +17,6 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Required keys and comments: [`.env.template`](./.env.template).
 
+My Files uses the `user-files` bucket. Object keys are `{userId}/{sanitizedFileName}`. To-dos live at `/todos` (`/table` redirects). OpenRouter BYOK is saved through `/api/user/byok-key` and stored in `user_settings.openrouter_api_key` (service role only).
+
 Do not add Composio env vars. Do not use project ID `glplvrljdgowcwuubkau` or Vercel project `marketing-agent-truman`.

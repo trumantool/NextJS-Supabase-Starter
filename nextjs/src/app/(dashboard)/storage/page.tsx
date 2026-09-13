@@ -175,8 +175,12 @@ export default function FileManagementPage() {
         <div className="space-y-6 p-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>File Management</CardTitle>
-                    <CardDescription>Upload, download, and share your files</CardDescription>
+                    <CardTitle>My Files</CardTitle>
+                    <CardDescription>
+                        Private files in the <code className="text-xs">user-files</code> bucket
+                        at <code className="text-xs">{'{userId}/{filename}'}</code>.
+                        Upload, download, or create a 24-hour signed URL.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {error && (

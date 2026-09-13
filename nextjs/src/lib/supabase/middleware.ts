@@ -41,6 +41,7 @@ export async function updateSession(request: NextRequest) {
         '/dashboard',
         '/resume-builder',
         '/storage',
+        '/todos',
         '/table',
         '/user-settings',
         '/admin',

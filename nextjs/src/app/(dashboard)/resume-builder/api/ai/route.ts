@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
               { role: 'user', content: userMsg },
             ],
             onChunk: (delta) => send(JSON.stringify({ delta })),
+            userId: user.id,
           })
           send(JSON.stringify({ done: true }))
         } catch (err) {

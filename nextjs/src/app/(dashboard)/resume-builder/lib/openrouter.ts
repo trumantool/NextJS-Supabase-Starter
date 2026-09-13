@@ -1,23 +1,20 @@
 // Resume Builder — OpenRouter client (server-side only).
-// Never expose the API key to the browser. The key is read from env.
+// Never expose the API key to the browser.
 
+import { resolveOpenRouterKey } from '@/lib/byok'
 import type { OpenRouterModel } from './types'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1'
 const DEFAULT_MODEL = 'poolside/laguna-s-2.1:free'
 
-/** Resolve the API key, preferring the primary var, falling back to the reachthem key. */
-export function getOpenRouterKey(): string {
-  return (
-    process.env.OPENROUTER_API_KEY ||
-    process.env.OPENROUTER_API_KEY_REACHTHEMAI ||
-    ''
-  )
+/** Platform key for admin model listing. User BYOK is resolved per request. */
+export async function getOpenRouterKey(userId?: string): Promise<string> {
+  return resolveOpenRouterKey(userId)
 }
 
 /** List available models from OpenRouter (for the admin dropdown). */
 export async function listOpenRouterModels(): Promise<OpenRouterModel[]> {
-  const key = getOpenRouterKey()
+  const key = await getOpenRouterKey()
   const res = await fetch(`${OPENROUTER_URL}/models`, {
     headers: {
       Authorization: `Bearer ${key}`,
@@ -42,9 +39,10 @@ export async function streamChatCompletion(opts: {
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
   onChunk: (delta: string) => void
   signal?: AbortSignal
+  userId?: string
 }): Promise<string> {
-  const key = getOpenRouterKey()
-  const { model, messages, onChunk, signal } = opts
+  const { model, messages, onChunk, signal, userId } = opts
+  const key = await getOpenRouterKey(userId)
 
   const res = await fetch(`${OPENROUTER_URL}/chat/completions`, {
     method: 'POST',

@@ -1,5 +1,6 @@
 // Resume Builder — POST: persist the admin-chosen OpenRouter model.
 import { NextResponse, type NextRequest } from 'next/server'
+import { isCurrentUserAdmin } from '@/app/(dashboard)/admin/actions'
 import { createSSRClient } from '@/lib/supabase/server'
 import { setOpenRouterModel } from '../../lib/supabase-resumes'
 
@@ -11,6 +12,9 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (!(await isCurrentUserAdmin())) {
+      return NextResponse.json({ error: 'Forbidden: admin access required' }, { status: 403 })
     }
 
     const body = (await request.json()) as { model?: string }
