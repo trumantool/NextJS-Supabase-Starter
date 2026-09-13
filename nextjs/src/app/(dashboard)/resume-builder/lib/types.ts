@@ -13,13 +13,13 @@ export interface PmNode {
   text?: string
 }
 
-/** The full document stored in `resumes.doc_json`. */
+/** The full document stored in `documents.doc_json`. */
 export interface ResumeDoc {
   type: 'doc'
   content: PmNode[]
 }
 
-/** Row shape for the `resumes` table. */
+/** Row shape for the `documents` table (temporary Resume* alias until Phase 3). */
 export interface ResumeMeta {
   id: string
   user_id: string
@@ -31,7 +31,7 @@ export interface ResumeMeta {
   updated_at: string
 }
 
-/** Insert shape for the `resumes` table. */
+/** Insert shape for the `documents` table. */
 export interface ResumeInsert {
   user_id: string
   title?: string
@@ -40,7 +40,7 @@ export interface ResumeInsert {
   model?: string
 }
 
-/** Update shape for the `resumes` table. */
+/** Update shape for the `documents` table. */
 export interface ResumeUpdate {
   title?: string
   template?: string

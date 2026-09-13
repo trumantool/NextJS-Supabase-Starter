@@ -1,18 +1,39 @@
-# Supabase (v1)
+# Supabase (Phase 1)
 
-## Migrations decision (Phase 0)
+## Migrations (preferred)
 
-This repo does **not** ship `supabase/migrations/` yet.
+This repo ships a real `supabase/migrations/` history starting at:
 
-v1 setup: apply [`schema.sql`](./schema.sql) **once** on a **new empty** Supabase project (Dashboard → SQL Editor → run the file).
+- [`migrations/20260913223000_slim_starter_baseline.sql`](./migrations/20260913223000_slim_starter_baseline.sql)
 
-Why not real migrations in Phase 0:
+That baseline is the keep-only schema (documents, not resumes; no contact/assessment/Composio tables).
 
-- `schema.sql` is an idempotent dump (`IF NOT EXISTS` / `DROP IF EXISTS`), not a linear migration history.
-- Splitting it into incremental migrations would rewrite the current baseline.
-- Phase 1 slims the schema to the keep-only tables/buckets and **will introduce** `supabase/migrations/` from that slim dump.
+On a **new empty** Supabase project:
 
-`npx supabase migrations up --linked` will fail until Phase 1 lands migrations. `config.toml` still references `./seed.sql` for local CLI reset; that file is not present and is unused for hosted v1 setup.
+```bash
+npx supabase login
+npx supabase link
+npx supabase db push --linked
+```
+
+`npx supabase migrations up --linked` also works once the project is linked.
+
+## Consolidated view
+
+[`schema.sql`](./schema.sql) is the same SQL as the baseline migration, kept as a single-file view for reading and optional SQL Editor apply on an empty project. Prefer migrations for forks. Do not re-run `schema.sql` on a project that already applied the migration.
+
+## Storage buckets
+
+| Bucket | Purpose |
+|---|---|
+| `user-files` | My Files UI (`{userId}/…`) |
+| `files` | Chat attachments (`{userId}/chat-attachments/{chatId}/…`) — unused until Phase 5 |
+| `agent-skills` | Skill markdown (`shared/` + `{userId}/`) — unused until Phase 4 |
+| `agent-memory` | Per-user agent memory — unused until Phase 4 |
+
+There is **no** `resumes` or `documents` storage bucket. Document content lives in `documents.doc_json`.
+
+`handle_new_user` seeds `user_data`, `user_settings`, and folder markers in all four buckets.
 
 ## Do not reuse Marketing Agent
 

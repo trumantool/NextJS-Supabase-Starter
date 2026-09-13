@@ -2,7 +2,7 @@
 
 Reusable Next.js 15 + Supabase SaaS starter. This repo is being slimmed to keep auth, file uploads, documents + AI editing, todos, generic AI chat/agents/skills, automations, and the user/admin settings those need.
 
-The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phase 0 is repo hygiene (this README, env template, schema apply docs). Later phases slim the schema and port chat/agents/automations.
+The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phase 0 is repo hygiene. Phase 1 is the slim keep-only schema + migrations. Later phases harden keep surfaces and port chat/agents/automations.
 
 Derived from [Razikus/supabase-nextjs-template](https://github.com/Razikus/supabase-nextjs-template).
 
@@ -25,26 +25,26 @@ The web app lives in `nextjs/`. Current dashboard surfaces:
 - Authentication (email/password, MFA)
 - File uploads (`files` bucket)
 - To-dos (`todo_list`)
-- Resume-era TipTap + OpenRouter editor (`/resume-builder`, table `resumes`) — Phase 3 renames this to Documents
+- TipTap + OpenRouter editor (`/resume-builder`, table `documents`) — Phase 3 renames this to Documents
 - User settings and admin site settings
 
-Chat, agents, skills, and automations are **not** in the app yet (Phases 4–6).
+Chat, agents, skills, and automations tables exist in the schema but have **no UI yet** (Phases 4–6).
 
 `supabase-expo-template/` is an optional Expo sample. It is **not** part of the slim web starter path. Do not expand it for v1.
 
-## Schema for v1 — apply `schema.sql` once
+## Schema — prefer migrations
 
-There is **no** `supabase/migrations/` directory. `npx supabase migrations up` will not work.
+On a **new empty** Supabase project, apply the keep-only baseline:
 
-On a **new empty** Supabase project, apply the current baseline once:
+```bash
+npx supabase login
+npx supabase link
+npx supabase db push --linked
+```
 
-1. Open the project in the [Supabase Dashboard](https://supabase.com/dashboard)
-2. Go to **SQL Editor**
-3. Paste and run [`supabase/schema.sql`](./supabase/schema.sql)
+That creates only the keep tables and buckets (`user-files`, `files`, `agent-skills`, `agent-memory`). Document content lives in `documents.doc_json` — there is no resumes/documents storage bucket.
 
-That dump is idempotent (`IF NOT EXISTS` / `DROP IF EXISTS`) and includes the tables, RLS, triggers, storage buckets (`files`, `resumes`), and seed rows the current app expects.
-
-Phase 1 will rewrite `schema.sql` to the keep-only model and introduce real `supabase/migrations/` from that slim baseline. Do not treat the current dump as the long-term migration history.
+[`supabase/schema.sql`](./supabase/schema.sql) is the same SQL as the baseline migration, kept as a consolidated view. You can paste it into the SQL Editor on an empty project instead of using the CLI. Do not re-run it on a project that already applied migrations.
 
 Details: [`supabase/README.md`](./supabase/README.md).
 
@@ -54,7 +54,7 @@ Details: [`supabase/README.md`](./supabase/README.md).
 
 2. Create a **new empty** Supabase project (not Marketing Agent).
 
-3. Apply [`supabase/schema.sql`](./supabase/schema.sql) once in the SQL Editor (see above).
+3. Apply migrations (`npx supabase db push --linked`) or paste [`supabase/schema.sql`](./supabase/schema.sql) once in the SQL Editor on an empty project.
 
 4. From **Project Settings → API**, copy:
    - Project URL
@@ -119,7 +119,6 @@ Do not attach Marketing Agent’s Vercel project or database.
 The previous README claimed files that are not present. Do not look for:
 
 - `README_ZH.md` / `README_MOBILE_ZH.md` — not in this repository
-- `supabase/migrations/` — not present (v1 applies `schema.sql`)
 - `supabase/migrations_for_old/` — not present
 - Root `.env.template` — the template is `nextjs/.env.template`
 

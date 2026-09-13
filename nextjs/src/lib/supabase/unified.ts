@@ -55,21 +55,21 @@ export class SassClient {
     async uploadFile(myId: string, filename: string, file: File) {
         filename = filename.replace(/[^0-9a-zA-Z!\-_.*'()]/g, '_');
         filename = myId + "/" + filename
-        return this.client.storage.from('files').upload(filename, file);
+        return this.client.storage.from('user-files').upload(filename, file);
     }
 
     async getFiles(myId: string) {
-        return this.client.storage.from('files').list(myId)
+        return this.client.storage.from('user-files').list(myId)
     }
 
     async deleteFile(myId: string, filename: string) {
         filename = myId + "/" + filename
-        return this.client.storage.from('files').remove([filename])
+        return this.client.storage.from('user-files').remove([filename])
     }
 
     async shareFile(myId: string, filename: string, timeInSec: number, forDownload: boolean = false) {
         filename = myId + "/" + filename
-        return this.client.storage.from('files').createSignedUrl(filename, timeInSec, {
+        return this.client.storage.from('user-files').createSignedUrl(filename, timeInSec, {
             download: forDownload
         });
 

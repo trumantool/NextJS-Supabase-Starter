@@ -5,7 +5,6 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import {
     CalendarDays,
     Home,
-    Mic,
     FileText,
     Files,
     LucideListTodo,
@@ -63,19 +62,6 @@ export default function DashboardContent() {
                             <div>
                                 <h3 className="font-medium">Home</h3>
                                 <p className="text-sm text-gray-500">Your dashboard overview</p>
-                            </div>
-                        </Link>
-
-                        <Link
-                            href="/audio-text-assessment"
-                            className="flex items-center gap-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-primary-50 rounded-full">
-                                <Mic className="h-4 w-4 text-primary-600" />
-                            </div>
-                            <div>
-                                <h3 className="font-medium">Intake Assessment</h3>
-                                <p className="text-sm text-gray-500">Record with transcription</p>
                             </div>
                         </Link>
 
