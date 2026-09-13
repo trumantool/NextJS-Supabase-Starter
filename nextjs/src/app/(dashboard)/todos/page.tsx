@@ -204,8 +204,11 @@ export default function TaskManagementPage() {
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                     <div>
-                        <CardTitle>Task Management</CardTitle>
-                        <CardDescription>Manage your tasks and to-dos</CardDescription>
+                        <CardTitle>To Do</CardTitle>
+                        <CardDescription>
+                            Create, complete, and delete tasks. Rows are owner-scoped by RLS on
+                            <code className="text-xs"> todo_list</code>.
+                        </CardDescription>
                     </div>
                     <CreateTaskDialog onTaskCreated={loadTasks} />
                 </CardHeader>

@@ -45,13 +45,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     const productName = process.env.NEXT_PUBLIC_PRODUCTNAME;
 
-    // Phase 1: hide assessment/contact product surfaces. Chat/agents/automations
-    // land in Phases 4–6. Resume Builder stays until Phase 3 Documents rename.
+    // Phase 2: Files, To Do, settings. Chat/agents/automations land in
+    // Phases 4–6. Resume Builder stays until Phase 3 Documents rename.
     const navigation = [
         { name: 'Home', href: '/dashboard', icon: Home },
         { name: 'Resume Builder', href: '/resume-builder', icon: FileText },
         { name: 'My Files', href: '/storage', icon: Files },
-        { name: 'To Do Lists', href: '/table', icon: LucideListTodo },
+        { name: 'To Do', href: '/todos', icon: LucideListTodo },
         { name: 'User Settings', href: '/user-settings', icon: User },
     ];
 

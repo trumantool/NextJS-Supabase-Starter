@@ -31,16 +31,16 @@ export default function PublicFooter() {
           <div>
             <h4 className="text-sm font-semibold text-gray-900">Resources</h4>
             <ul className="mt-4 space-y-2">
-              <li>
-                <Link href="/resume-builder" className="text-gray-600 hover:text-gray-900">
-                  Resume Builder
-                </Link>
-              </li>
-              <li>
-                <Link href="https://github.com/genspark-ai/genoffice/" className="text-gray-600 hover:text-gray-900">
-                  Powered by GenOffice
-                </Link>
-              </li>
+                <li>
+                  <Link href="/auth/login" className="text-gray-600 hover:text-gray-900">
+                    Sign in
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
+                    Dashboard
+                  </Link>
+                </li>
             </ul>
           </div>
           <div>

@@ -5,6 +5,7 @@
 This repo ships a real `supabase/migrations/` history starting at:
 
 - [`migrations/20260913223000_slim_starter_baseline.sql`](./migrations/20260913223000_slim_starter_baseline.sql)
+- [`migrations/20260913224500_byok_column_privileges.sql`](./migrations/20260913224500_byok_column_privileges.sql) — `openrouter_api_key` is service-role only
 
 That baseline is the keep-only schema (documents, not resumes; no contact/assessment/Composio tables).
 
@@ -26,7 +27,7 @@ npx supabase db push --linked
 
 | Bucket | Purpose |
 |---|---|
-| `user-files` | My Files UI (`{userId}/…`) |
+| `user-files` | My Files UI. Object key is `{userId}/{sanitizedFileName}`. Folder markers from `handle_new_user` are hidden in the list. |
 | `files` | Chat attachments (`{userId}/chat-attachments/{chatId}/…`) — unused until Phase 5 |
 | `agent-skills` | Skill markdown (`shared/` + `{userId}/`) — unused until Phase 4 |
 | `agent-memory` | Per-user agent memory — unused until Phase 4 |

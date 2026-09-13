@@ -1,31 +1,33 @@
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Files, FileText, ListTodo, ShieldCheck } from 'lucide-react';
 
 export default function AuthLayout({
                                        children,
                                    }: {
     children: React.ReactNode;
 }) {
-    const productName = process.env.NEXT_PUBLIC_PRODUCTNAME;
-    const testimonials = [
+    const productName = process.env.NEXT_PUBLIC_PRODUCTNAME || 'Starter';
+    const highlights = [
         {
-            quote: "The AI writing assistant helped me turn a plain list of duties into a compelling summary. I landed three interviews in the first week of applying.",
-            author: "Sarah Chen",
-            role: "Marketing Manager",
-            avatar: "SC"
+            title: 'Auth with optional MFA',
+            body: 'Email sign-in and two-factor setup are included.',
+            icon: ShieldCheck,
         },
         {
-            quote: "I tailored my resume to each job description in minutes instead of hours. The one-click .docx export opened perfectly in every ATS I applied through.",
-            author: "Michael Roberts",
-            role: "Software Engineer",
-            avatar: "MR"
+            title: 'Private files and to-dos',
+            body: 'Owner-scoped storage and tasks, enforced with RLS.',
+            icon: Files,
         },
         {
-            quote: "The autosave and cloud storage meant I could edit my resume from my laptop and phone without ever losing progress. It genuinely made job hunting less stressful.",
-            author: "Jessica Kim",
-            role: "Recent Graduate",
-            avatar: "JK"
-        }
+            title: 'Documents and AI settings',
+            body: 'Edit JSON documents. Use a platform OpenRouter key or your own.',
+            icon: FileText,
+        },
+        {
+            title: 'Starter dashboard',
+            body: 'A small keep-set of features you can fork and rename.',
+            icon: ListTodo,
+        },
     ];
 
     return (
@@ -54,40 +56,30 @@ export default function AuthLayout({
                 <div className="w-full flex items-center justify-center p-12">
                     <div className="space-y-6 max-w-lg">
                         <h3 className="text-white text-2xl font-bold mb-8">
-                            Loved by job seekers everywhere
+                            What you get in {productName}
                         </h3>
-                        {testimonials.map((testimonial, index) => (
+                        {highlights.map((item) => (
                             <div
-                                key={index}
+                                key={item.title}
                                 className="relative bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 shadow-xl"
                             >
                                 <div className="flex items-start space-x-4">
                                     <div className="flex-shrink-0">
-                                        <div className="w-10 h-10 rounded-full bg-primary-400/30 flex items-center justify-center text-white font-semibold">
-                                            {testimonial.avatar}
+                                        <div className="w-10 h-10 rounded-full bg-primary-400/30 flex items-center justify-center text-white">
+                                            <item.icon className="h-5 w-5" />
                                         </div>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-white/90 mb-2 font-light leading-relaxed">
-                                            &#34;{testimonial.quote}&#34;
+                                        <p className="text-sm font-medium text-white">
+                                            {item.title}
                                         </p>
-                                        <div className="mt-3">
-                                            <p className="text-sm font-medium text-white">
-                                                {testimonial.author}
-                                            </p>
-                                            <p className="text-sm text-primary-200">
-                                                {testimonial.role}
-                                            </p>
-                                        </div>
+                                        <p className="mt-1 text-sm text-white/90 font-light leading-relaxed">
+                                            {item.body}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                         ))}
-                        <div className="mt-8 text-center">
-                            <p className="text-primary-100 text-sm">
-                                Join thousands of job seekers landing roles with {productName}
-                            </p>
-                        </div>
                     </div>
                 </div>
             </div>

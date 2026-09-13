@@ -2,7 +2,7 @@
 
 Reusable Next.js 15 + Supabase SaaS starter. This repo is being slimmed to keep auth, file uploads, documents + AI editing, todos, generic AI chat/agents/skills, automations, and the user/admin settings those need.
 
-The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phase 0 is repo hygiene. Phase 1 is the slim keep-only schema + migrations. Later phases harden keep surfaces and port chat/agents/automations.
+The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phases 0–2 are in: hygiene, keep-only schema, and hardened Files / To Do / BYOK / admin / branding. Later phases generalize Documents and port chat/agents/automations.
 
 Derived from [Razikus/supabase-nextjs-template](https://github.com/Razikus/supabase-nextjs-template).
 
@@ -23,10 +23,10 @@ Do not write to `trumantool/marketing-agent` or `onhprojects/supabase-nextjs-sta
 The web app lives in `nextjs/`. Current dashboard surfaces:
 
 - Authentication (email/password, MFA)
-- File uploads (`files` bucket)
-- To-dos (`todo_list`)
+- File uploads (`user-files` bucket, objects at `{userId}/{filename}`)
+- To-dos (`/todos`, table `todo_list`; `/table` redirects)
 - TipTap + OpenRouter editor (`/resume-builder`, table `documents`) — Phase 3 renames this to Documents
-- User settings and admin site settings
+- User settings (profile, password, MFA, OpenRouter BYOK) and admin site settings + AI Docs model
 
 Chat, agents, skills, and automations tables exist in the schema but have **no UI yet** (Phases 4–6).
 
@@ -98,7 +98,7 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Browser + server Supabase clients |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Anon client + middleware |
 | `PRIVATE_SUPABASE_SERVICE_KEY` | Yes | `serverAdminClient` (service role) |
-| `OPENROUTER_API_KEY` | Yes for AI | Resume/document OpenRouter client |
+| `OPENROUTER_API_KEY` | Yes for AI | Platform OpenRouter key (users may override with BYOK) |
 | `NEXT_PUBLIC_PRODUCTNAME` | Yes | Title, header, footer, homepage |
 | `NEXT_PUBLIC_THEME` | No | Body theme class (default `theme-sass3`) |
 | `NEXT_PUBLIC_GOOGLE_TAG` | No | Google Analytics |
@@ -106,7 +106,7 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 | `NEXT_PUBLIC_TIERS_*` / `NEXT_PUBLIC_POPULAR_TIER` / `NEXT_PUBLIC_COMMON_FEATURES` | No | Homepage pricing demo |
 | `CRON_SECRET` | Reserved | Phase 6 automations cron/worker (not read yet) |
 
-`NODE_ENV` is set by Next.js. Do not set `OPENROUTER_API_KEY_REACHTHEMAI` (legacy fallback only).
+`NODE_ENV` is set by Next.js. Do not set `OPENROUTER_API_KEY_REACHTHEMAI`. The app reads `OPENROUTER_API_KEY` and optional per-user BYOK keys only.
 
 ## Deploy (later — not provisioned by this repo)
 

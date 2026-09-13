@@ -1,5 +1,32 @@
 import {SupabaseClient} from "@supabase/supabase-js";
+import {FileObject} from "@supabase/storage-js";
 import {Database} from "@/lib/types";
+
+/**
+ * My Files bucket. Objects live at `{userId}/{sanitizedFileName}`.
+ * Chat attachments use the separate `files` bucket (Phase 5).
+ * Optional metadata can go in `user_files`; list/upload/delete talk to Storage.
+ */
+export const USER_FILES_BUCKET = 'user-files'
+
+/** Folder markers and hidden objects created by handle_new_user / Storage. */
+export function isListedUserFile(file: FileObject): boolean {
+    if (!file.name || file.name.endsWith('/')) return false
+    if (file.name.startsWith('.')) return false
+    if (file.id === null) return false
+    return true
+}
+
+/** `{userId}/{sanitizedOriginalName}` — must match storage RLS path prefix. */
+export function userFileObjectPath(userId: string, originalName: string): string {
+    const safeName = originalName.replace(/[^0-9a-zA-Z!\-_.*'()]/g, '_')
+    return `${userId}/${safeName}`
+}
+
+/** Join a listed object name (already stored) with the owner prefix. */
+export function userFileStoredPath(userId: string, storedName: string): string {
+    return `${userId}/${storedName}`
+}
 
 export enum ClientType {
     SERVER = 'server',
@@ -53,26 +80,32 @@ export class SassClient {
     }
 
     async uploadFile(myId: string, filename: string, file: File) {
-        filename = filename.replace(/[^0-9a-zA-Z!\-_.*'()]/g, '_');
-        filename = myId + "/" + filename
-        return this.client.storage.from('user-files').upload(filename, file);
+        return this.client.storage.from(USER_FILES_BUCKET).upload(
+            userFileObjectPath(myId, filename),
+            file
+        );
     }
 
     async getFiles(myId: string) {
-        return this.client.storage.from('user-files').list(myId)
+        const result = await this.client.storage.from(USER_FILES_BUCKET).list(myId)
+        if (result.data) {
+            result.data = result.data.filter(isListedUserFile)
+        }
+        return result
     }
 
     async deleteFile(myId: string, filename: string) {
-        filename = myId + "/" + filename
-        return this.client.storage.from('user-files').remove([filename])
+        return this.client.storage.from(USER_FILES_BUCKET).remove([
+            userFileStoredPath(myId, filename)
+        ])
     }
 
     async shareFile(myId: string, filename: string, timeInSec: number, forDownload: boolean = false) {
-        filename = myId + "/" + filename
-        return this.client.storage.from('user-files').createSignedUrl(filename, timeInSec, {
-            download: forDownload
-        });
-
+        return this.client.storage.from(USER_FILES_BUCKET).createSignedUrl(
+            userFileStoredPath(myId, filename),
+            timeInSec,
+            { download: forDownload }
+        );
     }
 
     async getMyTodoList(page: number = 1, pageSize: number = 100, order: string = 'created_at', done: boolean | null = false) {

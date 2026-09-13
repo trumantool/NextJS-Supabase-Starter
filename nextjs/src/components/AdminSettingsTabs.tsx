@@ -6,7 +6,7 @@ import { ModelSettingsForm } from '@/app/(dashboard)/resume-builder/components/M
 
 const TABS = [
   { id: 'site', label: 'Site Settings' },
-  { id: 'resume', label: 'Resume Settings' },
+  { id: 'ai-docs', label: 'AI Docs' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -41,9 +41,10 @@ export function AdminSettingsTabs() {
         <AdminSettingsForm />
       ) : (
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">Resume Settings</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">AI Docs</h2>
           <p className="text-sm text-gray-500 mb-6">
-            Configure the AI model used by the resume builder.
+            Default OpenRouter model stored in <code>app_settings.openrouter_model</code>.
+            Used by the document editor AI panel.
           </p>
           <ModelSettingsForm />
         </div>
