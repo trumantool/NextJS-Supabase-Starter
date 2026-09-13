@@ -1,6 +1,10 @@
 # Supabase Expo Mobile Template
 
-A production-ready mobile SaaS template built with React Native, Expo, and Supabase. This template provides a complete mobile application with authentication, file management, task management, and internationalization support.
+**Unsupported in the slim web starter.** The default product is `nextjs/` only. Leave this folder as-is; do not expand Expo for v1. Use the [root README](./README.md) to fork the web app.
+
+---
+
+A leftover Expo sample (React Native + Supabase) with authentication, file management, and task management. Not part of the slim keep set.
 
 ## Video
 [![Watch the video](https://img.youtube.com/vi/qcASa0Ywsy4/maxresdefault.jpg)](https://youtube.com/shorts/qcASa0Ywsy4?feature=share)

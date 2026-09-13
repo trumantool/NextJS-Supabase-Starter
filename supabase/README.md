@@ -1,4 +1,6 @@
-# Supabase (Phase 1)
+# Supabase
+
+Keep-only schema for the slim web starter (Phases 0–6 on `main`).
 
 ## Migrations (preferred)
 
@@ -47,4 +49,6 @@ Create a new empty project per fork.
 
 ## After apply
 
-Copy the new project’s URL, anon key, and `service_role` key into `nextjs/.env.local` as documented in `nextjs/.env.template`. The service role variable name used by the app is `PRIVATE_SUPABASE_SERVICE_KEY`.
+Copy the new project’s URL, anon key, and `service_role` key into `nextjs/.env.local` as documented in `nextjs/.env.template`. The service role variable name used by the app is `PRIVATE_SUPABASE_SERVICE_KEY`. Never expose `service_role` to the browser (`NEXT_PUBLIC_*`).
+
+Set `CRON_SECRET` in the Next.js / Vercel server env (not in Supabase). Cron wake ≠ execute — see the root README.

@@ -1,8 +1,8 @@
 # Next.js + Supabase Starter
 
-Reusable Next.js 15 + Supabase SaaS starter. This repo is being slimmed to keep auth, file uploads, documents + AI editing, todos, generic AI chat/agents/skills, automations, and the user/admin settings those need.
+Reusable Next.js 15 + Supabase SaaS starter. The default product is the slim keep set: auth/MFA, files, todos, documents, chat, agents/skills/templates, automations, and the user/admin settings those need.
 
-The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phases 0–6 are in: hygiene, keep-only schema, hardened Files / To Do / BYOK / admin / branding, Documents, Agents / Skills / Templates, Chat, and Automations. Phase 7 is forkability polish.
+Phases 0–6 of [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md) are on `main`. This README is the fork path.
 
 Derived from [Razikus/supabase-nextjs-template](https://github.com/Razikus/supabase-nextjs-template).
 
@@ -18,26 +18,31 @@ Do **not** use:
 
 Do not write to `trumantool/marketing-agent` or `onhprojects/supabase-nextjs-starter`. Those repos are reference-only.
 
-## What exists today
+Do not set `OPENROUTER_API_KEY_REACHTHEMAI`. The app reads `OPENROUTER_API_KEY` and optional per-user BYOK only.
 
-The web app lives in `nextjs/`. Current dashboard surfaces:
+## Features (slim keep set)
 
-- Authentication (email/password, MFA)
-- File uploads (`user-files` bucket, objects at `{userId}/{filename}`)
-- To-dos (`/todos`, table `todo_list`; `/table` redirects)
-- Documents (`/documents`, table `documents`) — TipTap editor, AI panel, .docx export; `/resume-builder` redirects here
-- Agents (`/agents`, table `user_agents`) — create/edit, attach `skill_ids`, set `defaults.model_id`, clone from a template
-- Skills Library (`/agent-skills`, table `agent_skills`, bucket `agent-skills`) — upload/list shared vs mine
-- Agent Templates (`/agent-templates`, table `agent_templates`) — published gallery; admin CRUD under Admin → Agent Templates
-- Chat (`/chat`, tables `chats` / `messages`) — OpenRouter threads, agent switcher, skills-as-context, attachments on the `files` bucket
-- Automations (`/automations`, tables `automations` / `automation_runs`) — CRUD, grok-style schedule presets, Run now, run history/transcript. Worker uses OpenRouter + skills only (no Composio)
-- User settings (profile, password, MFA, OpenRouter BYOK) and admin site settings + AI Docs model
+The web app lives in `nextjs/`. Dashboard / nav surfaces:
+
+| Surface | Route | Notes |
+|---|---|---|
+| Auth / MFA | `/auth/**` | Email/password, optional TOTP |
+| Files | `/storage` | `user-files` bucket, objects at `{userId}/{filename}` |
+| To Do | `/todos` | Table `todo_list` (`/table` redirects) |
+| Documents | `/documents` | TipTap + AI panel + .docx export (`/resume-builder` redirects) |
+| Chat | `/chat` | OpenRouter threads, agent switcher, skill context, attachments on `files` |
+| Agents | `/agents` | `user_agents` — `skill_ids`, `defaults.model_id`, clone from a template |
+| Skills | `/agent-skills` | Shared vs mine; bucket `agent-skills` |
+| Templates | `/agent-templates` | Published gallery; admin CRUD under Admin → Agent Templates |
+| Automations | `/automations` | Schedule + Run now + run history. OpenRouter + skills only (no Composio) |
+| User settings | `/user-settings` | Profile, password, MFA, OpenRouter BYOK |
+| Admin | `/admin` | Site title/url/support, AI Docs model, agent templates |
 
 The starter ships **one** generic Starter Assistant recipe (no SEO/Ads seeds).
 
-`supabase-expo-template/` is an optional Expo sample. It is **not** part of the slim web starter path. Do not expand it for v1.
+**Out of the default IA:** marketing/ReachThem campaigns, Composio Ads/SEO admin, intake/assessments, and the old contact-product inbox. `/contact` is a static support page only.
 
-## Schema — prefer migrations
+## Schema apply (`supabase/migrations/` + `schema.sql` view)
 
 On a **new empty** Supabase project, apply the keep-only baseline:
 
@@ -53,47 +58,42 @@ That creates only the keep tables and buckets (`user-files`, `files`, `agent-ski
 
 Details: [`supabase/README.md`](./supabase/README.md).
 
+## New empty Supabase project checklist
+
+Use this on every fork. Never attach Marketing Agent’s project.
+
+1. Create a **new empty** Supabase project. Confirm the project ref is **not** `glplvrljdgowcwuubkau`.
+2. Apply schema: `npx supabase db push --linked` from this repo, **or** paste [`supabase/schema.sql`](./supabase/schema.sql) **once** in the SQL Editor on an empty project.
+3. From **Project Settings → API**, copy Project URL, `anon` `public` key, and `service_role` key.
+4. Auth → URL configuration: Site URL `http://localhost:3000`, redirect `http://localhost:3000/**`. Hosted later: your production origin and `https://YOUR_DOMAIN/**`.
+5. `cd nextjs && cp .env.template .env.local`. Fill from the **new** project. Required keys are listed under [Environment variables](#environment-variables).
+6. Generate `CRON_SECRET` with `openssl rand -hex 32`. Put it only in server/Vercel env — never `NEXT_PUBLIC_*`.
+7. Set `OPENROUTER_API_KEY` from [openrouter.ai/keys](https://openrouter.ai/keys). Do **not** set `OPENROUTER_API_KEY_REACHTHEMAI`.
+8. Set `NEXT_PUBLIC_PRODUCTNAME`.
+9. `npm install && npm run dev` from `nextjs/`. Open [http://localhost:3000](http://localhost:3000).
+10. When you deploy: create a **new** Vercel project (never `marketing-agent-truman`). Root Directory = `nextjs`. Set the same server secrets, including `CRON_SECRET`.
+
+## Security reminders
+
+- **No `service_role` on the client.** The app reads it as `PRIVATE_SUPABASE_SERVICE_KEY` in server code only (`serverAdminClient`). Never prefix it with `NEXT_PUBLIC_`. Never ship it in browser bundles.
+- **RLS is owner-scoped.** Tables and storage policies use `auth.uid()` / `authenticative.is_user_authenticated()`. Do not weaken policies to “get the demo working.”
+- **`CRON_SECRET` on worker/cron only.** `/api/cron/automations` and `/api/workers/automations` return 401 if the bearer token is missing or wrong. Cron **wakes** a queue; it does not run the model. See [Automations cron](#automations-cron-wake--execute).
+
 ## Local setup
 
 1. Fork or clone this repository.
-
-2. Create a **new empty** Supabase project (not Marketing Agent).
-
-3. Apply migrations (`npx supabase db push --linked`) or paste [`supabase/schema.sql`](./supabase/schema.sql) once in the SQL Editor on an empty project.
-
-4. From **Project Settings → API**, copy:
-   - Project URL
-   - `anon` `public` key
-   - `service_role` key (server-only)
-
-5. In the Supabase Auth settings, set **Site URL** to `http://localhost:3000` and add `http://localhost:3000/**` to redirect URLs. `supabase/config.toml` already uses those values for local CLI work; hosted projects must be set in the dashboard.
-
-6. Install and configure the Next.js app:
+2. Follow the [new empty Supabase project checklist](#new-empty-supabase-project-checklist).
+3. Run the app from `nextjs/`:
 
    ```bash
    cd nextjs
    npm install
    cp .env.template .env.local
-   ```
-
-7. Fill `nextjs/.env.local` from your **new** project. Required keys:
-
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `PRIVATE_SUPABASE_SERVICE_KEY` (this is the `service_role` secret; the app does not read `SUPABASE_SERVICE_ROLE_KEY`)
-   - `OPENROUTER_API_KEY` (needed for Documents AI, Chat, and Automations)
-   - `NEXT_PUBLIC_PRODUCTNAME`
-   - `CRON_SECRET` (needed to wake automations cron/worker; generate with `openssl rand -hex 32`)
-
-   See [`nextjs/.env.template`](./nextjs/.env.template) for optional site, theme, SSO, and pricing keys. Composio keys are out of v1.
-
-8. Run the app from `nextjs/`:
-
-   ```bash
+   # fill keys from the NEW empty project
    npm run dev
    ```
 
-9. Open [http://localhost:3000](http://localhost:3000).
+4. Open [http://localhost:3000](http://localhost:3000).
 
 ## Environment variables
 
@@ -103,20 +103,22 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Browser + server Supabase clients |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Anon client + middleware |
-| `PRIVATE_SUPABASE_SERVICE_KEY` | Yes | `serverAdminClient` (service role) |
+| `PRIVATE_SUPABASE_SERVICE_KEY` | Yes | `serverAdminClient` (service role, server-only) |
 | `OPENROUTER_API_KEY` | Yes for AI | Platform OpenRouter key for Documents, Chat, and Automations (users may override with BYOK) |
 | `NEXT_PUBLIC_PRODUCTNAME` | Yes | Title, header, footer, homepage |
+| `CRON_SECRET` | Yes for cron | Bearer secret for `/api/cron/automations` and `/api/workers/automations` |
 | `NEXT_PUBLIC_THEME` | No | Body theme class (default `theme-sass3`) |
 | `NEXT_PUBLIC_GOOGLE_TAG` | No | Google Analytics |
 | `NEXT_PUBLIC_SSO_PROVIDERS` | No | Comma list: `github`, `google`, `facebook`, `apple` |
 | `NEXT_PUBLIC_TIERS_*` / `NEXT_PUBLIC_POPULAR_TIER` / `NEXT_PUBLIC_COMMON_FEATURES` | No | Homepage pricing demo |
-| `CRON_SECRET` | Yes for cron | Bearer secret for `/api/cron/automations` and `/api/workers/automations` |
 
-`NODE_ENV` is set by Next.js. Do not set `OPENROUTER_API_KEY_REACHTHEMAI`. The app reads `OPENROUTER_API_KEY` and optional per-user BYOK keys only.
+`NODE_ENV` is set by Next.js. Do not set `OPENROUTER_API_KEY_REACHTHEMAI`. Do not add Composio or Treg keys.
 
 ## Deploy (later — not provisioned by this repo)
 
-When you deploy, create a **new** Vercel project pointed at this repo. Set the Next.js **Root Directory** to `nextjs` so [`nextjs/vercel.json`](./nextjs/vercel.json) cron entries apply. Set the same keys from `nextjs/.env.local` as Vercel environment variables, including `CRON_SECRET`. Update Supabase Auth site URL and redirect URLs to the production origin (`https://YOUR_DOMAIN/**`).
+This repo does **not** create a Vercel or Supabase project for you.
+
+When you deploy, create a **new** Vercel project pointed at this fork. Set the Next.js **Root Directory** to `nextjs` so [`nextjs/vercel.json`](./nextjs/vercel.json) cron entries apply. Set the same keys from `nextjs/.env.local` as Vercel environment variables, including `CRON_SECRET` and `PRIVATE_SUPABASE_SERVICE_KEY`. Update Supabase Auth site URL and redirect URLs to the production origin.
 
 Do not attach Marketing Agent’s Vercel project or database.
 
@@ -152,6 +154,10 @@ curl -sS -H "Authorization: Bearer $CRON_SECRET" \
   http://localhost:3000/api/cron/automations
 ```
 
+## Expo (unsupported in the slim web starter)
+
+`supabase-expo-template/` is leftover Expo sample code. It is **unsupported** on the slim web starter path. Do not expand it. Do not treat [`README_MOBILE.md`](./README_MOBILE.md) as required setup.
+
 ## Docs that are **not** in this repo
 
 The previous README claimed files that are not present. Do not look for:
@@ -160,7 +166,7 @@ The previous README claimed files that are not present. Do not look for:
 - `supabase/migrations_for_old/` — not present
 - Root `.env.template` — the template is `nextjs/.env.template`
 
-`README_MOBILE.md` describes the optional Expo folder only.
+`.github/skills/app-build-plans/` holds historical resume-builder notes. Do not follow them for this starter.
 
 ## Legal documents
 
