@@ -129,7 +129,7 @@ export async function createBlankUserAgent(
   }
 
   const snapshot = buildUserAgentSnapshot(
-    blankAgentRecipe(named.name),
+    blankAgentRecipe(),
     named.name,
     parsedOverrides.overrides
   )

@@ -78,13 +78,7 @@ export default function AgentSkillsPage() {
   const shared = tab === 'shared'
   const canWrite = shared ? isAdmin : Boolean(user?.id)
 
-  useEffect(() => {
-    if (user?.id) {
-      void seedFolderAndLoad()
-    }
-  }, [user?.id])
-
-  const seedFolderAndLoad = async () => {
+  const seedFolderAndLoad = useCallback(async () => {
     try {
       setLoading(true)
       setError('')
@@ -101,20 +95,26 @@ export default function AgentSkillsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (user?.id) {
+      void seedFolderAndLoad()
+    }
+  }, [user?.id, seedFolderAndLoad])
 
   const visibleSkills = skills.filter((skill) =>
     shared ? skill.user_id === null : skill.user_id === user?.id
   )
 
-  const openUploadDialog = (file: File) => {
+  const openUploadDialog = useCallback((file: File) => {
     if (!canWrite) return
     setWriteShared(shared)
     setPendingFile(file)
     setUploadName('')
     setUploadDescription('')
     setShowUploadDialog(true)
-  }
+  }, [canWrite, shared])
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = event.target.files
@@ -132,7 +132,7 @@ export default function AgentSkillsPage() {
       const dropped = Array.from(e.dataTransfer.files)
       if (dropped.length > 0) openUploadDialog(dropped[0])
     },
-    [canWrite, shared]
+    [canWrite, openUploadDialog]
   )
 
   const handleUploadConfirm = async () => {

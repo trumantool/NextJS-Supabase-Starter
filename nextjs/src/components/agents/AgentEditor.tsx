@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
@@ -36,11 +36,7 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  useEffect(() => {
-    void load()
-  }, [agentId])
-
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true)
       const [agentRes, skillsRes] = await Promise.all([
@@ -66,7 +62,11 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [agentId])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const save = async () => {
     try {

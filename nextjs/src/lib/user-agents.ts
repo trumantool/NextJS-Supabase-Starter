@@ -202,7 +202,7 @@ export async function attachAgentMemory(
   }
 }
 
-export function blankAgentRecipe(_name: string): Parameters<typeof buildUserAgentSnapshot>[0] {
+export function blankAgentRecipe(): Parameters<typeof buildUserAgentSnapshot>[0] {
   return {
     id: '',
     name: 'Custom',
