@@ -1,6 +1,7 @@
 import {SupabaseClient} from "@supabase/supabase-js";
 import {FileObject} from "@supabase/storage-js";
 import {Database} from "@/lib/types";
+import {AGENT_SKILLS_BUCKET} from "@/lib/agent-skills";
 
 /**
  * My Files bucket. Objects live at `{userId}/{sanitizedFileName}`.
@@ -103,6 +104,29 @@ export class SassClient {
     async shareFile(myId: string, filename: string, timeInSec: number, forDownload: boolean = false) {
         return this.client.storage.from(USER_FILES_BUCKET).createSignedUrl(
             userFileStoredPath(myId, filename),
+            timeInSec,
+            { download: forDownload }
+        );
+    }
+
+    async createAgentSkillsFolder(userId: string) {
+        return this.client.storage.from(AGENT_SKILLS_BUCKET).upload(
+            `${userId}/`,
+            new Blob([]),
+            { upsert: true }
+        );
+    }
+
+    async listAgentSkills() {
+        return this.client
+            .from('agent_skills')
+            .select('*')
+            .order('skill_name', { ascending: true });
+    }
+
+    async signAgentSkillUrl(skillUrl: string, timeInSec: number, forDownload: boolean = false) {
+        return this.client.storage.from(AGENT_SKILLS_BUCKET).createSignedUrl(
+            skillUrl,
             timeInSec,
             { download: forDownload }
         );
