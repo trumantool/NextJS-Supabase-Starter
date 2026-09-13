@@ -1,0 +1,8 @@
+{
+  "[sql]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "supabase.projectRef": "mjysxkxsktalulooajfv",
+  "supabase.url": "https://mjysxkxsktalulooajfv.supabase.co"
+}

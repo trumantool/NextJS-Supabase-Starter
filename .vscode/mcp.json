@@ -1,0 +1,16 @@
+{
+  "servers": {
+    "com.supabase/mcp": {
+      "type": "stdio",
+      "command": "/workspaces/voiceapp/.vscode/run-supabase-mcp.sh",
+      "args": [],
+      "env": {}
+    },
+    "vercel": {
+      "type": "stdio",
+      "command": "/workspaces/voiceapp/.vscode/run-vercel-mcp.sh",
+      "args": [],
+      "env": {}
+    }
+  }
+}

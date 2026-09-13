@@ -1,0 +1,12 @@
+.expo
+.env
+.env.mcp
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+.vercel
+.env*

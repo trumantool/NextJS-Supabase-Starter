@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LS/RNR INTERVIEW GUIDE</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #1b365d;
+            --accent-color: #0066cc;
+            --bg-color: #f4f6f8;
+            --border-color: #d1d5db;
+            --danger-color: #d9534f;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: #222;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        header {
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin: 0 0 15px 0;
+            font-size: 1.6rem;
+            text-transform: uppercase;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            background: #eef2f6;
+            padding: 15px;
+            border-radius: 6px;
+        }
+
+        .meta-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #444;
+        }
+
+        .meta-field input {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background-color: var(--primary-color);
+            color: white;
+            text-align: left;
+            padding: 10px;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        td {
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            vertical-align: top;
+        }
+
+        .section-header td {
+            background-color: #e2e8f0;
+            font-weight: bold;
+            color: var(--primary-color);
+            font-size: 0.95rem;
+            padding: 10px;
+        }
+
+        select {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .answer-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        /* Large expandable answer box to display all 750 words */
+        textarea.answer-text {
+            width: 100%;
+            min-height: 180px; /* Larger baseline height */
+            max-height: 600px;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            resize: vertical;
+            overflow-y: auto;
+        }
+
+        .btn-rec {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: bold;
+            width: fit-content;
+        }
+
+        .btn-rec.recording {
+            background-color: var(--danger-color);
+            animation: pulse 1.5s infinite;
+        }
+
+        .word-count {
+            font-size: 0.8rem;
+            color: #555;
+            text-align: right;
+            font-weight: 500;
+        }
+
+        .word-count.limit-reached {
+            color: var(--danger-color);
+            font-weight: bold;
+        }
+
+        audio {
+            width: 100%;
+            height: 32px;
+            margin-top: 4px;
+        }
+
+        .export-bar {
+            position: sticky;
+            bottom: 20px;
+            background: var(--primary-color);
+            padding: 15px 20px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            margin-top: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .btn-export {
+            background-color: #2ea44f;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>LS/RNR INTERVIEW GUIDE</h1>
+        <div class="meta-grid">
+            <div class="meta-field">
+                <label>Client Name:</label>
+                <input type="text" id="client-name" placeholder="John Doe">
+            </div>
+            <div class="meta-field">
+                <label>DOB:</label>
+                <input type="date" id="client-dob">
+            </div>
+            <div class="meta-field">
+                <label>Interviewer Name:</label>
+                <input type="text" id="interviewer-name" placeholder="Officer / Evaluator">
+            </div>
+            <div class="meta-field">
+                <label>Interview Date:</label>
+                <input type="date" id="interview-date">
+            </div>
+        </div>
+    </header>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 40%;">QUESTIONS</th>
+                <th style="width: 12%;">YES / NO</th>
+                <th style="width: 48%;">ANSWER / FULL VOICE TRANSCRIPT (UP TO 750 WORDS)</th>
+            </tr>
+        </thead>
+        <tbody id="guide-body"></tbody>
+    </table>
+
+    <div class="export-bar">
+        <span id="progress-status">0 / 0 Completed</span>
+        <button class="btn-export" onclick="exportData()">Download CSV & Audio Package</button>
+    </div>
+</div>
+
+<script>
+const MAX_WORDS = 750;
+
+const questionnaireData = [
+  {
+    "section": "1.1 Criminal History",
+    "questions": [
+      "How old were you the first time you were arrested?",
+      "*Based on answer above, confirm no arrests under age 18.",
+      "What types of charges have you been arrested for?",
+      "How many times have you been incarcerated/had to serve time?",
+      "As a juvenile? As an adult?",
+      "When were you last released?",
+      "What's the longest amount of time you've had to serve?",
+      "When incarcerated, did you have any behavior problems, confinements, DRs? If yes, for what and how many times?",
+      "Are you currently on probation? If yes, what type of charge?",
+      "Have you been on probation in the past? If yes, have you ever violated your probation? How did you violate (non-compliance? Failed drug test? Failure to report? Etc.)",
+      "Do you have any outstanding or pending charges?"
+    ]
+  },
+  {
+    "section": "1.2 Education/Employment",
+    "questions": [
+      "What's the highest grade you completed in school?",
+      "When you were in school, did you have any extra assistance in any subjects or repeat any grades?",
+      "Were you ever suspended or expelled?",
+      "Are you currently employed? If yes, full-time or part-time? Where?",
+      "Out of the last 12 months, how many have you been employed?",
+      "What's the longest you've been employed for?",
+      "Have you ever been unemployed in the community for 12 months?",
+      "What industries have you worked in/types of jobs have you held in the past?",
+      "What did you like or dislike about your past employment?",
+      "Did you get along with your coworkers?",
+      "Did you like working for your supervisor?"
+    ]
+  },
+  {
+    "section": "1.3 Family/Marital",
+    "questions": [
+      "What is your current relationship status?",
+      "*Follow-up questions based on answer above*",
+      "If in a relationship- how is your current relationship on scale of 1-10? Are you getting along? Any concerns with intimacy (emotional or physical), jealousy, finances, friends, infidelity, intimacy etc.?",
+      "If single- how do you feel about being single? Do you enjoy the single life, are you actively looking for someone, etc.?",
+      "Have you ever been married?",
+      "Do you have any children? If yes, ages, how often do you see/communicate with them?",
+      "Where did you grow up? Who were you raised by? How often do you talk with them or see them? (If not raised by parents- explore if there is a relationship/contact with them if answer isn't already provided)",
+      "Tell me about your relationship with other family members? Siblings, aunt, uncles, cousins, grandparents etc. How often do you talk with them or see them?",
+      "Does anyone in your family, including spouse/significant other and close relatives have a criminal record?"
+    ]
+  },
+  {
+    "section": "1.4 Leisure/Recreation",
+    "questions": [
+      "Are you active in any organized activities, clubs, groups etc.?",
+      "What do you like to do in your free time? Any hobbies or activities you enjoy?"
+    ]
+  },
+  {
+    "section": "1.5 Companions",
+    "questions": [
+      "I know some people like to have tons of friends and acquaintances and some prefer just a few. How would you classify yourself?",
+      "Of the people you know, what % of them would you say have had trouble with the law?",
+      "Do you know many people or have many friends not involved in criminal activities?",
+      "How do you feel about being in larger groups?"
+    ]
+  },
+  {
+    "section": "1.6 Alcohol/Drug Problems",
+    "questions": [
+      "Do you have any history of drug or alcohol abuse?",
+      "*Based on answer above.*",
+      "What is your drug(s) of choice? When were you last using? Have your drug use habits changed in the last year?",
+      "How much do you drink? Have your drinking habits changed in the last year?",
+      "Has your drug or alcohol use contributed to your arrests or law violations?",
+      "Have your family or friends expressed concern about your drug or alcohol use?",
+      "Have you experienced problems with employment due to your drug or alcohol use?",
+      "Have you had any medical problems due to your drug or alcohol use? (OD, doctor encouraged you to stop using, blackouts, withdrawal etc.)"
+    ]
+  },
+  {
+    "section": "1.7 Procriminal Attitude/Orientation",
+    "questions": [
+      "How do you feel about the crimes you've committed?",
+      "Would you like to lead a life without crime?",
+      "Do you think your sentence was appropriate and fair?",
+      "Do you feel that the supervision you are/were placed under is/was appropriate fair?"
+    ]
+  },
+  {
+    "section": "1.8 Antisocial Patterns",
+    "questions": [
+      "Have you ever been given a mental health diagnosis or evaluated for mental health concerns? (depression, anxiety, PTSD, etc.)",
+      "Do you have any history of violent offenses?",
+      "Have you had any history of escape or attempted escape from custody?",
+      "Do you have any current source of income? If yes, how much per month?",
+      "Do you receive any assistance from family, friends, or government like SNAP?",
+      "Do you have any existing debts? (Court fines/fees? Medical expenses?) If yes, approximately how much?",
+      "How many residential addresses have you had in the past year?"
+    ]
+  },
+  {
+    "section": "Section 2",
+    "questions": [
+      "If on probation- is your probation officer fair/reasonable?",
+      "Are you afraid of anyone hurting or harming you?",
+      "Any concerns regarding problems solving such as acting impulsively, setting goals, getting in trouble by almost by accident?",
+      "Any concerns regarding anger or frustration such as getting impatient with others, arguing with friends or family, physical fights?",
+      "Any intimidating or controlling behavior such as physically hurting your partner, jealously etc.?",
+      "Has anyone accused you of sexually inappropriate behavior such as streaking, masturbating in public, sexual assault or sexual violence?",
+      "Are you a sociable person, does making friends or meeting strangers come easy to you?",
+      "Are most of your friends your age, older or younger than you?",
+      "Have you experienced racist or sexist behavior- you towards others or others towards you?",
+      "Any history of physical violence towards others? Specifically- strangers, own children, partner, authority figures etc.",
+      "Any history of stalking or harassing behavior? For example, call text, call text, threatening someone, etc.",
+      "Have you ever used a weapon to hurt or harm someone?",
+      "Have you ever intentionally set fire to destroy property or harm someone?",
+      "Any history of driving under the influence or DUI charges?",
+      "Any history of shoplifting?",
+      "Any history of gang involvement, organized crime, white collar crime, embezzlement, hate crime or terrorist activity?"
+    ]
+  },
+  {
+    "section": "Section 3",
+    "questions": [
+      "Your last incarceration, was it federal, state or county?",
+      "What level of supervision/security? Minimum, medium, maximum?"
+    ]
+  },
+  {
+    "section": "Section 4 and Section 5",
+    "questions": [
+      "What is your current living situation? Family, friends, transitional housing?",
+      "How do you like the place where you are living?",
+      "Are you a citizen? Is English your first language?",
+      "If the client has children, do you have any parenting concerns? Trouble with your child listening to you, emotional distance, defiance etc.",
+      "Do you have any health concerns such as heart disease, diabetes, high blood pressure, hepatitis, HIV etc.? If yes, are you currently receiving medical care?",
+      "Have you been experiencing sadness or depression? Or feeling unhappy with yourself?",
+      "Have you ever experienced suicidal thoughts? Have you ever attempted suicide?",
+      "Have you ever been to a crisis stabilization unit or hospitalized for mental health concerns?",
+      "Are you currently taking, or have you taken psychotropic medications in the past?",
+      "Do you have any history of hearing voices or seeing things other people don't see or hear?",
+      "Any history of feeling things are \"unreal\" or uncontrollable urges/ideas?",
+      "Have you experienced forms of abuse including emotional, physical or sexual?",
+      "If yes, note by who, when and current effects based on client's willingness to answer.",
+      "Do you have any needs or concerns we have not discussed yet?",
+      "Health, emotional, personal, cultural or religious traditions your team needs to be aware of to assist you?",
+      "What do you hope to achieve in this program?",
+      "Where do you see yourself in 5 years?",
+      "Is there anything that will hinder you from successfully completing this program or reaching your goals?"
+    ]
+  }
+];
+
+const audioStorage = {};
+let mediaRecorder;
+let activeChunks = [];
+let speechRecognition;
+let activeIndex = null;
+let totalQuestions = 0;
+
+function initApp() {
+    const tbody = document.getElementById('guide-body');
+    let qCounter = 0;
+
+    questionnaireData.forEach((sec) => {
+        const secTr = document.createElement('tr');
+        secTr.className = 'section-header';
+        secTr.innerHTML = `<td colspan="3">${sec.section}</td>`;
+        tbody.appendChild(secTr);
+
+        sec.questions.forEach((qText) => {
+            const index = qCounter++;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="q-text">${qText}</td>
+                <td>
+                    <select id="yn-${index}" onchange="updateProgress()">
+                        <option value="">--</option>
+                        <option value="YES">YES</option>
+                        <option value="NO">NO</option>
+                        <option value="N/A">N/A</option>
+                    </select>
+                </td>
+                <td>
+                    <div class="answer-container">
+                        <button class="btn-rec" id="rec-btn-${index}" onclick="toggleRecord(${index})">🎙️ Record Response</button>
+                        <textarea class="answer-text" id="ans-${index}" placeholder="Speech transcription will stream here in real time..." oninput="handleTextInput(${index})"></textarea>
+                        <div class="word-count" id="wc-${index}">0 / ${MAX_WORDS} words</div>
+                        <audio id="audio-${index}" controls hidden></audio>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    });
+
+    totalQuestions = qCounter;
+    document.getElementById('interview-date').valueAsDate = new Date();
+    updateProgress();
+}
+
+// Word counting helper
+function getWordCount(text) {
+    const trimmed = text.trim();
+    if (!trimmed) return 0;
+    return trimmed.split(/\s+/).length;
+}
+
+// Truncate to exactly 750 words
+function truncateToWordLimit(text, limit) {
+    const words = text.trim().split(/\s+/);
+    if (words.length <= limit) return text;
+    return words.slice(0, limit).join(' ');
+}
+
+// Auto-expand textarea box height so all 750 words remain visible
+function autoExpandTextarea(textarea) {
+    textarea.style.height = "180px"; // baseline reset
+    textarea.style.height = (textarea.scrollHeight + 5) + "px"; // adjust to full content length
+}
+
+function handleTextInput(index) {
+    const textarea = document.getElementById(`ans-${index}`);
+    let text = textarea.value;
+    let count = getWordCount(text);
+
+    if (count > MAX_WORDS) {
+        textarea.value = truncateToWordLimit(text, MAX_WORDS);
+        count = MAX_WORDS;
+    }
+
+    autoExpandTextarea(textarea);
+    updateWordCountDisplay(index, count);
+    updateProgress();
+}
+
+function updateWordCountDisplay(index, count) {
+    const wcEl = document.getElementById(`wc-${index}`);
+    wcEl.innerText = `${count} / ${MAX_WORDS} words`;
+    if (count >= MAX_WORDS) {
+        wcEl.classList.add('limit-reached');
+    } else {
+        wcEl.classList.remove('limit-reached');
+    }
+}
+
+async function toggleRecord(index) {
+    const recBtn = document.getElementById(`rec-btn-${index}`);
+
+    if (activeIndex === index) {
+        stopRecording(index);
+        return;
+    }
+
+    if (activeIndex !== null) {
+        stopRecording(activeIndex);
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        activeChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => activeChunks.push(e.data);
+        
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(activeChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+            audioStorage[index] = { blob: blob };
+
+            const audioEl = document.getElementById(`audio-${index}`);
+            audioEl.src = URL.createObjectURL(blob);
+            audioEl.hidden = false;
+
+            stream.getTracks().forEach(track => track.stop());
+            updateProgress();
+        };
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            speechRecognition = new SpeechRecognition();
+            speechRecognition.continuous = true;
+            speechRecognition.interimResults = true;
+            speechRecognition.lang = 'en-US';
+
+            const textarea = document.getElementById(`ans-${index}`);
+            let initialText = textarea.value ? textarea.value.trim() + " " : "";
+
+            speechRecognition.onresult = (event) => {
+                let currentTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    currentTranscript += event.results[i][0].transcript;
+                }
+                
+                let combinedText = initialText + currentTranscript;
+                let wordCount = getWordCount(combinedText);
+
+                if (wordCount >= MAX_WORDS) {
+                    textarea.value = truncateToWordLimit(combinedText, MAX_WORDS);
+                    updateWordCountDisplay(index, MAX_WORDS);
+                    stopRecording(index); // Stop recording automatically at 750 words
+                } else {
+                    textarea.value = combinedText;
+                    updateWordCountDisplay(index, wordCount);
+                }
+
+                autoExpandTextarea(textarea);
+                textarea.scrollTop = textarea.scrollHeight; // Keep view focused on newest words
+                updateProgress();
+            };
+
+            speechRecognition.start();
+        }
+
+        mediaRecorder.start();
+        activeIndex = index;
+        recBtn.classList.add('recording');
+        recBtn.innerText = '⏹️ Stop Recording';
+
+    } catch (err) {
+        alert('Microphone permission is required for voice recording and speech recognition.');
+        console.error(err);
+    }
+}
+
+function stopRecording(index) {
+    const recBtn = document.getElementById(`rec-btn-${index}`);
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+    }
+    if (speechRecognition) {
+        speechRecognition.stop();
+    }
+    if (recBtn) {
+        recBtn.classList.remove('recording');
+        recBtn.innerText = '🎙️ Record Response';
+    }
+    activeIndex = null;
+}
+
+function updateProgress() {
+    let filledCount = 0;
+
+    for (let i = 0; i < totalQuestions; i++) {
+        const ynVal = document.getElementById(`yn-${i}`).value;
+        const ansVal = document.getElementById(`ans-${i}`).value.trim();
+        const hasAudio = !!audioStorage[i];
+
+        if (ynVal || ansVal || hasAudio) {
+            filledCount++;
+        }
+    }
+
+    document.getElementById('progress-status').innerText = `${filledCount} / ${totalQuestions} Questions Handled`;
+}
+
+async function exportData() {
+    const zip = new JSZip();
+    const manifest = [];
+    let qCounter = 0;
+
+    const clientName = document.getElementById('client-name').value || 'N/A';
+    const clientDOB = document.getElementById('client-dob').value || 'N/A';
+    const interviewerName = document.getElementById('interviewer-name').value || 'N/A';
+    const interviewDate = document.getElementById('interview-date').value || 'N/A';
+
+    let csvContent = `LS/RNR INTERVIEW GUIDE\n`;
+    csvContent += `Client Name:,${csvEscape(clientName)},DOB:,${csvEscape(clientDOB)}\n`;
+    csvContent += `Interviewer Name:,${csvEscape(interviewerName)},Interview Date:,${csvEscape(interviewDate)}\n\n`;
+    csvContent += `SECTION,QUESTIONS,YES / NO,ANSWER,AUDIO FILE\n`;
+
+    questionnaireData.forEach((sec) => {
+        sec.questions.forEach((qText) => {
+            const index = qCounter++;
+            const ynVal = document.getElementById(`yn-${index}`).value;
+            const ansVal = document.getElementById(`ans-${index}`).value.trim();
+            const hasAudio = !!audioStorage[index];
+            const audioFileName = hasAudio ? `q${index + 1}_audio.webm` : '';
+
+            if (hasAudio) {
+                zip.file(audioFileName, audioStorage[index].blob);
+            }
+
+            csvContent += `${csvEscape(sec.section)},${csvEscape(qText)},${csvEscape(ynVal)},${csvEscape(ansVal)},${csvEscape(audioFileName)}\n`;
+
+            manifest.push({
+                questionNumber: index + 1,
+                section: sec.section,
+                question: qText,
+                yesNo: ynVal,
+                answerText: ansVal,
+                audioFileName: audioFileName
+            });
+        });
+    });
+
+    zip.file("LS_RNR_Interview_Guide.csv", csvContent);
+    zip.file("interview_data.json", JSON.stringify({
+        metadata: { clientName, clientDOB, interviewerName, interviewDate },
+        records: manifest
+    }, null, 2));
+
+    const content = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(content);
+    a.download = `LS_RNR_${clientName.replace(/\s+/g, '_')}_${interviewDate}.zip`;
+    a.click();
+}
+
+function csvEscape(str) {
+    if (!str) return '""';
+    return '"' + String(str).replace(/"/g, '""') + '"';
+}
+
+window.onload = initApp;
+</script>
+</body>
+</html>
