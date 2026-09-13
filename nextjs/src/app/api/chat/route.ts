@@ -10,7 +10,7 @@ import {
   titleFromFirstMessage,
   type ChatAttachment,
 } from '@/lib/chat-messages'
-import { getPlatformChatModel, getValidChatModel, streamChatCompletion } from '@/lib/chat-openrouter'
+import { getValidChatModel, streamChatCompletion } from '@/lib/chat-openrouter'
 import { loadAgentSkills } from '@/lib/load-agent-skills'
 import { isUuid } from '@/lib/ids'
 import { createSSRClient } from '@/lib/supabase/server'
