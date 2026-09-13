@@ -81,9 +81,36 @@ export function isAllowedSkillObjectKey(objectKey: string, ownerUserId: string):
   return objectKey.startsWith(`${ownerUserId}/`) || objectKey.startsWith('shared/')
 }
 
+export async function assertSkillIdsVisible(
+  supabase: SupabaseClient,
+  userId: string,
+  skillIds: string[]
+): Promise<string | null> {
+  if (skillIds.length === 0) return null
+
+  const { data, error } = await supabase
+    .from('agent_skills')
+    .select('id, user_id')
+    .in('id', skillIds)
+
+  if (error) {
+    console.error('assertSkillIdsVisible:', error)
+    return 'Failed to validate skills.'
+  }
+
+  const byId = new Map((data || []).map((row) => [String(row.id).toLowerCase(), row]))
+  for (const id of skillIds) {
+    const row = byId.get(id.toLowerCase())
+    if (!row || !isSkillVisibleToOwner(userId, row.user_id)) {
+      return 'One or more skills are not available. Choose skills from your library or the shared library.'
+    }
+  }
+  return null
+}
+
 /**
- * Load skill markdown for an agent's skill_ids and format it as system context.
- * Shared with a future automations worker (Phase 6). No Composio / toolkits.
+ * Load skill markdown for an agent's or automation's skill_ids and format it
+ * as system context. No Composio / toolkits.
  */
 export async function loadAgentSkills(opts: {
   supabase: SupabaseClient

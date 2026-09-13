@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Bot,
   MessageSquare,
+  CalendarClock,
 } from 'lucide-react';
 import AuthAwareButtons from '@/components/AuthAwareButtons';
 import HomePricing from "@/components/HomePricing";
@@ -75,6 +76,14 @@ export default function Home() {
       bg: 'bg-sky-50',
     },
     {
+      icon: CalendarClock,
+      title: 'Automations',
+      description:
+        'Schedule a prompt, attach skills, and inspect run transcripts. Cron wakes a queue; the worker executes.',
+      color: 'text-amber-600',
+      bg: 'bg-amber-50',
+    },
+    {
       icon: Settings,
       title: 'User and admin settings',
       description:
@@ -95,7 +104,7 @@ export default function Home() {
       number: '02',
       title: 'Sign in',
       description:
-        'Register, optionally enable MFA, then use Files, To Do, Documents, Chat, and Agents.',
+        'Register, optionally enable MFA, then use Files, To Do, Documents, Chat, Agents, and Automations.',
     },
     {
       number: '03',
@@ -119,8 +128,8 @@ export default function Home() {
             </h1>
             <p className="mt-6 text-xl text-gray-600 max-w-xl">
               A forkable SaaS starter with auth, private files, to-dos, a document
-              editor, agents and skills, and server-side OpenRouter settings. No
-              marketing product coupling.
+              editor, agents and skills, chat, scheduled automations, and
+              server-side OpenRouter settings. No marketing product coupling.
             </p>
             <div className="mt-10 flex gap-4 flex-wrap">
               <AuthAwareButtons />
@@ -143,7 +152,8 @@ export default function Home() {
               What ships in this starter
             </h2>
             <p className="mt-4 text-xl text-gray-600 max-w-2xl mx-auto">
-              Keep these surfaces, then add chat and automations in later phases.
+              Keep these surfaces. Automations run OpenRouter plus skills on a
+              schedule — no Composio or ads integrations.
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
