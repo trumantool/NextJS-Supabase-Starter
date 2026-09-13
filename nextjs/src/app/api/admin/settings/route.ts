@@ -3,8 +3,8 @@ import { getAdminSettings, updateAdminSetting } from '@/app/(dashboard)/admin/ac
 
 /**
  * GET /api/admin/settings
- * Returns all admin settings (admin only). Mirrors the working resume API-route
- * pattern (avoids the React Server Actions transport).
+ * Returns all admin settings (admin only). Uses a route handler
+ * (avoids the React Server Actions transport).
  */
 export async function GET() {
   try {

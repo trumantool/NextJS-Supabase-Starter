@@ -1,5 +1,7 @@
 # Slim Starter Feature Extract — Implementation Plan
 
+> **Status (2026-09-13):** Phases **0–6 shipped on `main`** (hygiene, slim schema + migrations, files/todos/BYOK/admin, documents, agents/skills/templates, chat, automations + cron). Phase **7** is forkability polish (this README / checklist / residue pass). No dedicated Vercel or Supabase project has been provisioned. Live signed-in E2E against a throwaway project is still an open verification gap.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn `trumantool/NextJS-Supabase-Starter` into a reusable Next.js 15 + Supabase SaaS starter that keeps only: file uploads, Document Creator + AI editing, todos, general AI agent chat with configurable skills, automations for that agent, and the minimal user/admin settings + schema/buckets those need.
@@ -51,30 +53,30 @@ This plan defines keep / port / drop, the target schema, and ordered Eng phases.
 
 ## Acceptance criteria
 
-- [ ] Starter dashboard exposes only keep features (+ auth): Files, Documents, To Do, Chat, Agents/Skills (or equivalent IA), Automations, User Settings, Admin (site + AI model + agent templates as needed).
-- [ ] No ReachThem/marketing campaign UI, no Composio Ads/SEO admin, no intake/assessment/contact-product surfaces in the default nav.
-- [ ] `supabase/schema.sql` lists only keep tables/buckets; RLS owner-scoped; `handle_new_user` seeds required folders/rows.
-- [ ] Documents: create/edit/export + AI panel via OpenRouter; no “resume” user-facing copy.
-- [ ] Chat: threads/messages, agent switcher, skills injection for configured agents, optional chat file attachments on `files` bucket.
-- [ ] Automations: CRUD + schedule + run history; worker/cron path secured by `CRON_SECRET`; runs with skills + OpenRouter without Composio.
-- [ ] `.env.template` documents required keys; README setup matches reality (migrations or explicit schema apply).
-- [ ] Fresh fork can stand up against a **new** empty Supabase project without referencing marketing-agent IDs.
+- [x] Starter dashboard exposes only keep features (+ auth): Files, Documents, To Do, Chat, Agents/Skills (or equivalent IA), Automations, User Settings, Admin (site + AI model + agent templates as needed).
+- [x] No ReachThem/marketing campaign UI, no Composio Ads/SEO admin, no intake/assessment/contact-product surfaces in the default nav.
+- [x] `supabase/schema.sql` lists only keep tables/buckets; RLS owner-scoped; `handle_new_user` seeds required folders/rows.
+- [x] Documents: create/edit/export + AI panel via OpenRouter; no “resume” user-facing copy.
+- [x] Chat: threads/messages, agent switcher, skills injection for configured agents, optional chat file attachments on `files` bucket.
+- [x] Automations: CRUD + schedule + run history; worker/cron path secured by `CRON_SECRET`; runs with skills + OpenRouter without Composio.
+- [x] `.env.template` documents required keys; README setup matches reality (migrations or explicit schema apply).
+- [x] Fresh fork can stand up against a **new** empty Supabase project without referencing marketing-agent IDs. (Docs + checklist only — no project provisioned by this repo.)
 
 ## Current state
 
-### NextJS-Supabase-Starter (`main` @ `a1170aa`)
+### NextJS-Supabase-Starter (`main` after Phases 0–6)
 | Area | State |
 |------|--------|
 | Auth/MFA | Present (`app/auth/**`, MFA components, middleware) |
-| Files | Present — `storage/page.tsx`, bucket `files`, helpers in `unified.ts` |
-| Todos | Present — `table/page.tsx`, table `todo_list` |
-| Documents | Resume TipTap + OpenRouter under `resume-builder/**`; table `resumes`; bucket `resumes` |
-| Chat / agents / skills / automations | **Absent** |
-| Settings | User profile/password; admin `admin_settings` + `app_settings` |
-| Schema | Single `supabase/schema.sql`; **no** `supabase/migrations/`; drift vs types for audio features |
-| Docs/plans | **Missing** (this plan creates it) |
-| Env template | **Missing** (README claims otherwise) |
-| Bloat | contact submissions, assessments/intake, legal editors, Expo template, Paddle deps |
+| Files | Present — `/storage`, bucket `user-files` |
+| Todos | Present — `/todos`, table `todo_list` (`/table` redirects) |
+| Documents | `/documents`, table `documents`, TipTap + OpenRouter (`/resume-builder` redirects) |
+| Chat / agents / skills / automations | Present — `/chat`, `/agents`, `/agent-skills`, `/agent-templates`, `/automations` + cron/worker |
+| Settings | User profile/password/MFA/BYOK; admin site + AI Docs model + agent templates |
+| Schema | `supabase/migrations/` baseline + `schema.sql` view; keep-only tables/buckets |
+| Docs/plans | This file; root README fork checklist (Phase 7) |
+| Env template | `nextjs/.env.template` including `CRON_SECRET` |
+| Out of default IA | assessments/intake, contact-product inbox, Composio Ads/SEO, Expo (folder left, unsupported) |
 
 ### marketing-agent (read-only reference)
 Keep surface already exists under `nextjs/`:
@@ -227,10 +229,10 @@ If Eng prefers minimal churn from current starter, keep existing `files` for My 
 - [ ] Verification: create automation, enqueue run, observe run history transcript.
 
 ### Phase 7 — Forkability polish
-- [ ] README: feature list, schema apply, env vars, cron secrets, “new Supabase project” checklist.
-- [ ] Grep for ReachThem / marketing-agent project IDs / `OPENROUTER_API_KEY_REACHTHEMAI` and neutralize.
-- [ ] Optional: remove Expo from default docs path; leave folder with “unsupported in slim web starter” note.
-- [ ] Done-when checklist below all green.
+- [x] README: feature list, schema apply, env vars, cron secrets, “new Supabase project” checklist.
+- [x] Grep for ReachThem / marketing-agent project IDs / `OPENROUTER_API_KEY_REACHTHEMAI` and neutralize.
+- [x] Optional: remove Expo from default docs path; leave folder with “unsupported in slim web starter” note.
+- [x] Done-when checklist below all green (docs + code IA). Live signed-in E2E and a provisioned throwaway Supabase/Vercel project remain known gaps.
 
 ## Data / schema changes (target)
 
@@ -262,13 +264,13 @@ Owner-scoped policies; storage MFA-aware via `authenticative.is_user_authenticat
 
 ## Verification / Done-when
 
-1. Fresh Supabase project + env from `.env.template` boots `nextjs` locally.
-2. Sign up → MFA optional → see slim nav only.
-3. Upload/list/delete file; create/complete todo; create document + AI edit.
-4. Create skill + agent; chat with agent; run automation once (cron or manual run endpoint).
-5. Admin can set site title/url and default OpenRouter model; manage agent templates.
-6. `schema.sql` (or migrations) contains no assessment/contact/Composio/SEO residue.
-7. README fork checklist works without marketing-agent secrets or project IDs.
+1. Fresh Supabase project + env from `.env.template` boots `nextjs` locally. **Docs ready; no project provisioned by this repo.**
+2. Sign up → MFA optional → see slim nav only. **Nav/IA confirmed in code; live signed-in E2E not run in Phase 7.**
+3. Upload/list/delete file; create/complete todo; create document + AI edit. **Implemented in Phases 2–3; live E2E not re-run.**
+4. Create skill + agent; chat with agent; run automation once (cron or manual run endpoint). **Implemented in Phases 4–6; live E2E not re-run.**
+5. Admin can set site title/url and default OpenRouter model; manage agent templates. **Implemented; live E2E not re-run.**
+6. `schema.sql` (or migrations) contains no assessment/contact/Composio/SEO residue. **Met** (comments only as explicit bans).
+7. README fork checklist works without marketing-agent secrets or project IDs. **Met** (Phase 7).
 
 ## Keep / port / drop (Truman skim card)
 
@@ -286,11 +288,9 @@ Owner-scoped policies; storage MFA-aware via `authenticative.is_user_authenticat
 
 ## Handoff
 
-When this plan is merged (or on the PR):
-- Owner: **Engineer Boilerplate**
-- Start at **Phase 0**, then 1→7
-- Do not implement inside Planning Boilerplate
-- Escalate product calls (especially Composio-in-v1) to **Chief of Staff Boilerplate**
+Phases 0–7 are implemented on the starter repo. Remaining follow-ups: live signed-in E2E on a throwaway Supabase project, and a dedicated Vercel + Supabase pair (never Marketing Agent IDs).
+
+Do not implement inside Planning Boilerplate. Escalate product calls (especially Composio-in-v1) to **Chief of Staff Boilerplate**.
 
 ## Reference paths (read-only)
 

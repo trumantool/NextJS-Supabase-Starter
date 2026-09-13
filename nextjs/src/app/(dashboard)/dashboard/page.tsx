@@ -14,11 +14,12 @@ import {
     LayoutTemplate,
     MessageSquare,
     CalendarClock,
+    Settings,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardContent() {
-    const { loading, user } = useGlobal();
+    const { loading, user, isAdmin } = useGlobal();
 
     const getDaysSinceRegistration = () => {
         if (!user?.registered_at) return 0;
@@ -186,6 +187,21 @@ export default function DashboardContent() {
                                 <p className="text-sm text-gray-500">Manage your account preferences</p>
                             </div>
                         </Link>
+
+                        {isAdmin ? (
+                            <Link
+                                href="/admin"
+                                className="flex items-center gap-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                <div className="p-2 bg-primary-50 rounded-full">
+                                    <Settings className="h-4 w-4 text-primary-600" />
+                                </div>
+                                <div>
+                                    <h3 className="font-medium">Admin</h3>
+                                    <p className="text-sm text-gray-500">Site settings, AI Docs model, agent templates</p>
+                                </div>
+                            </Link>
+                        ) : null}
                     </div>
                 </CardContent>
             </Card>

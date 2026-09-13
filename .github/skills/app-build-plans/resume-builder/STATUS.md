@@ -1,5 +1,9 @@
 # Resume Builder — STATUS
 
+> **Historical.** Resume Builder was generalized to `/documents`. This file is not a setup guide.
+> Do **not** set `OPENROUTER_API_KEY_REACHTHEMAI`. The app reads `OPENROUTER_API_KEY` and optional BYOK only.
+> See the repository root README and `docs/plans/slim-starter-feature-extract.md`.
+
 > Status of the Cloud Build Plan (`PLAN.md`) for the Resume Builder feature.
 > **Last updated:** 2026-08-12 · **Branch:** `nonprofit-cms`
 
@@ -106,9 +110,9 @@ resume-builder/
    no role checks anywhere). The settings page is reachable by any logged-in
    user. If real admin gating is wanted, that's a follow-up.
 
-4. **OpenRouter key** — uses `OPENROUTER_API_KEY` with fallback to
-   `OPENROUTER_API_KEY_REACHTHEMAI` (both present in `.env`). Key stays
-   server-side env only; never exposed to the client.
+4. **OpenRouter key (historical)** — this note described a fallback to
+   `OPENROUTER_API_KEY_REACHTHEMAI`. That key is **not used** in the slim
+   starter. Use `OPENROUTER_API_KEY` or per-user BYOK only.
 
 5. **Editor AI panel is a sidebar, not a full agent loop** — Plan §4 mentioned
    `packages/agent-core` skills composition. Simpler ship: chat-style prompts with

@@ -3,8 +3,8 @@ import { updatePrivacyPolicy } from '@/lib/actions/privacy'
 
 /**
  * POST /api/privacy
- * Saves the privacy policy content (admin only). Mirrors the working resume
- * API-route pattern (avoids the React Server Actions transport).
+ * Saves the privacy policy content (admin only). Uses a route handler
+ * (avoids the React Server Actions transport).
  * Returns 401/403/500 with an error message on failure.
  */
 export async function POST(request: NextRequest) {

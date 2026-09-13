@@ -3,8 +3,8 @@ import { updateTermsOfService } from '@/lib/actions/terms'
 
 /**
  * POST /api/terms
- * Saves the Terms of Service content (admin only). Mirrors the working resume
- * API-route pattern (avoids the React Server Actions transport).
+ * Saves the Terms of Service content (admin only). Uses a route handler
+ * (avoids the React Server Actions transport).
  */
 export async function POST(request: NextRequest) {
   try {
