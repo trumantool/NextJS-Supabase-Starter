@@ -66,15 +66,15 @@ export default function DashboardContent() {
                         </Link>
 
                         <Link
-                            href="/resume-builder"
+                            href="/documents"
                             className="flex items-center gap-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                         >
                             <div className="p-2 bg-primary-50 rounded-full">
                                 <FileText className="h-4 w-4 text-primary-600" />
                             </div>
                             <div>
-                                <h3 className="font-medium">Resume Builder</h3>
-                                <p className="text-sm text-gray-500">Create and edit resumes</p>
+                                <h3 className="font-medium">Documents</h3>
+                                <p className="text-sm text-gray-500">Create and edit documents</p>
                             </div>
                         </Link>
 

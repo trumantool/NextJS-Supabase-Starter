@@ -777,8 +777,6 @@ export const Constants = {
   },
 } as const
 
-/** Temporary alias while Phase 3 renames resume-builder → documents. */
-export type ResumeRow = Database['public']['Tables']['documents']['Row']
 export type Document = Database['public']['Tables']['documents']['Row']
 export type Automation = Database['public']['Tables']['automations']['Row']
 export type AutomationRun = Database['public']['Tables']['automation_runs']['Row']

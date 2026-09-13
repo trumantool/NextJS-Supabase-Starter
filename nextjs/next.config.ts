@@ -8,6 +8,26 @@ const nextConfig: NextConfig = {
         destination: '/todos',
         permanent: false,
       },
+      {
+        source: '/resume-builder',
+        destination: '/documents',
+        permanent: false,
+      },
+      {
+        source: '/resume-builder/api/resumes',
+        destination: '/documents/api/documents',
+        permanent: false,
+      },
+      {
+        source: '/resume-builder/api/resumes/:id',
+        destination: '/documents/api/documents/:id',
+        permanent: false,
+      },
+      {
+        source: '/resume-builder/:path*',
+        destination: '/documents/:path*',
+        permanent: false,
+      },
     ]
   },
 };

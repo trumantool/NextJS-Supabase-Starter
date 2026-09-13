@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { AdminSettingsForm } from '@/components/AdminSettingsForm'
-import { ModelSettingsForm } from '@/app/(dashboard)/resume-builder/components/ModelSettingsForm'
+import { ModelSettingsForm } from '@/app/(dashboard)/documents/components/ModelSettingsForm'
 
 const TABS = [
   { id: 'site', label: 'Site Settings' },
