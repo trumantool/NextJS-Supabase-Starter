@@ -2,7 +2,7 @@
 
 Reusable Next.js 15 + Supabase SaaS starter. This repo is being slimmed to keep auth, file uploads, documents + AI editing, todos, generic AI chat/agents/skills, automations, and the user/admin settings those need.
 
-The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phases 0–3 are in: hygiene, keep-only schema, hardened Files / To Do / BYOK / admin / branding, and Documents (TipTap + OpenRouter). Later phases port chat/agents/automations.
+The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phases 0–4 are in: hygiene, keep-only schema, hardened Files / To Do / BYOK / admin / branding, Documents, and Agents / Skills / Templates. Later phases port chat and automations.
 
 Derived from [Razikus/supabase-nextjs-template](https://github.com/Razikus/supabase-nextjs-template).
 
@@ -26,9 +26,12 @@ The web app lives in `nextjs/`. Current dashboard surfaces:
 - File uploads (`user-files` bucket, objects at `{userId}/{filename}`)
 - To-dos (`/todos`, table `todo_list`; `/table` redirects)
 - Documents (`/documents`, table `documents`) — TipTap editor, AI panel, .docx export; `/resume-builder` redirects here
+- Agents (`/agents`, table `user_agents`) — create/edit, attach `skill_ids`, set `defaults.model_id`, clone from a template
+- Skills Library (`/agent-skills`, table `agent_skills`, bucket `agent-skills`) — upload/list shared vs mine
+- Agent Templates (`/agent-templates`, table `agent_templates`) — published gallery; admin CRUD under Admin → Agent Templates
 - User settings (profile, password, MFA, OpenRouter BYOK) and admin site settings + AI Docs model
 
-Chat, agents, skills, and automations tables exist in the schema but have **no UI yet** (Phases 4–6).
+Chat and automations tables exist in the schema but have **no UI yet** (Phases 5–6). The starter ships **one** generic Starter Assistant recipe (no SEO/Ads seeds).
 
 `supabase-expo-template/` is an optional Expo sample. It is **not** part of the slim web starter path. Do not expand it for v1.
 

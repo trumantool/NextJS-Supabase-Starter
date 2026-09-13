@@ -204,11 +204,11 @@ If Eng prefers minimal churn from current starter, keep existing `files` for My 
 - [ ] Verification: create/edit/AI-suggest/export a document as signed-in user.
 
 ### Phase 4 — Agent skills + templates + user agents
-- [ ] Port `agent_skills` / `agent_templates` / `user_agents` schema already in Phase 1.
-- [ ] Port Skills Library UI + APIs (upload/list; shared vs mine); bucket `agent-skills`.
-- [ ] Port Agent Templates (user gallery + admin CRUD).
-- [ ] Port User Agents (create/edit, skill_ids, model_id, clone from template).
-- [ ] Do **not** port SEO/Ads template seeds — ship 0–1 generic starter templates only.
+- [x] Port `agent_skills` / `agent_templates` / `user_agents` schema already in Phase 1.
+- [x] Port Skills Library UI + APIs (upload/list; shared vs mine); bucket `agent-skills`.
+- [x] Port Agent Templates (user gallery + admin CRUD).
+- [x] Port User Agents (create/edit, skill_ids, model_id, clone from template).
+- [x] Do **not** port SEO/Ads template seeds — ship 0–1 generic starter templates only.
 - [ ] Verification: create skill, clone template → user agent, assign skills.
 
 ### Phase 5 — General AI chat
