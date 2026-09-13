@@ -10,3 +10,4 @@
 *.pfx
 .vercel
 .env*
+!.env.template

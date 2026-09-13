@@ -175,11 +175,11 @@ If Eng prefers minimal churn from current starter, keep existing `files` for My 
 ## Ordered implementation steps
 
 ### Phase 0 — Repo hygiene (Eng first PR)
-- [ ] Create `docs/plans/` (this file already lands here).
-- [ ] Add `nextjs/.env.template` with required keys (no secrets).
-- [ ] Fix README: remove false claims (missing ZH docs/migrations); document schema apply path.
-- [ ] Decide migrations approach: either introduce `supabase/migrations/` from cleaned schema, or document “apply `schema.sql` once” for v1 — **prefer real migrations** for forkability.
-- [ ] Confirm Cursor cloud agent access to `trumantool/NextJS-Supabase-Starter` (expected OK). Escalate if blocked.
+- [x] Create `docs/plans/` (this file already lands here).
+- [x] Add `nextjs/.env.template` with required keys (no secrets).
+- [x] Fix README: remove false claims (missing ZH docs/migrations); document schema apply path.
+- [x] Decide migrations approach: **v1 applies `supabase/schema.sql` once** (no `supabase/migrations/` yet). A Phase 0 split of the current dump is not useful; Phase 1 will introduce real migrations with the slim keep-only schema.
+- [x] Confirm Cursor cloud agent access to `trumantool/NextJS-Supabase-Starter` (expected OK). Escalate if blocked.
 
 ### Phase 1 — Schema slim + prune dead product
 - [ ] Rewrite `supabase/schema.sql` to keep-only tables/buckets/RLS listed above.
