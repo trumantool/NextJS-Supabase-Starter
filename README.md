@@ -2,7 +2,7 @@
 
 Reusable Next.js 15 + Supabase SaaS starter. This repo is being slimmed to keep auth, file uploads, documents + AI editing, todos, generic AI chat/agents/skills, automations, and the user/admin settings those need.
 
-The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phases 0–2 are in: hygiene, keep-only schema, and hardened Files / To Do / BYOK / admin / branding. Later phases generalize Documents and port chat/agents/automations.
+The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phases 0–3 are in: hygiene, keep-only schema, hardened Files / To Do / BYOK / admin / branding, and Documents (TipTap + OpenRouter). Later phases port chat/agents/automations.
 
 Derived from [Razikus/supabase-nextjs-template](https://github.com/Razikus/supabase-nextjs-template).
 
@@ -25,7 +25,7 @@ The web app lives in `nextjs/`. Current dashboard surfaces:
 - Authentication (email/password, MFA)
 - File uploads (`user-files` bucket, objects at `{userId}/{filename}`)
 - To-dos (`/todos`, table `todo_list`; `/table` redirects)
-- TipTap + OpenRouter editor (`/resume-builder`, table `documents`) — Phase 3 renames this to Documents
+- Documents (`/documents`, table `documents`) — TipTap editor, AI panel, .docx export; `/resume-builder` redirects here
 - User settings (profile, password, MFA, OpenRouter BYOK) and admin site settings + AI Docs model
 
 Chat, agents, skills, and automations tables exist in the schema but have **no UI yet** (Phases 4–6).

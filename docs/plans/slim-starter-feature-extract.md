@@ -197,10 +197,10 @@ If Eng prefers minimal churn from current starter, keep existing `files` for My 
 - [x] Strip public marketing/ReachThem copy to generic starter branding (`NEXT_PUBLIC_PRODUCTNAME`).
 
 ### Phase 3 — Documents generalization
-- [ ] Move `resume-builder` → `documents` routes/components (or alias then delete).
-- [ ] Persist to `documents` table; AI + export + models + settings routes.
-- [ ] Remove resume-specific template assumptions where easy; keep TipTap JSON doc model.
-- [ ] Admin AI Docs points at documents model setting.
+- [x] Move `resume-builder` → `documents` routes/components (or alias then delete).
+- [x] Persist to `documents` table; AI + export + models + settings routes.
+- [x] Remove resume-specific template assumptions where easy; keep TipTap JSON doc model.
+- [x] Admin AI Docs points at documents model setting.
 - [ ] Verification: create/edit/AI-suggest/export a document as signed-in user.
 
 ### Phase 4 — Agent skills + templates + user agents
