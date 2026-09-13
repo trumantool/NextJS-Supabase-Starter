@@ -2,7 +2,7 @@
 
 Reusable Next.js 15 + Supabase SaaS starter. This repo is being slimmed to keep auth, file uploads, documents + AI editing, todos, generic AI chat/agents/skills, automations, and the user/admin settings those need.
 
-The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phases 0–4 are in: hygiene, keep-only schema, hardened Files / To Do / BYOK / admin / branding, Documents, and Agents / Skills / Templates. Later phases port chat and automations.
+The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phases 0–5 are in: hygiene, keep-only schema, hardened Files / To Do / BYOK / admin / branding, Documents, Agents / Skills / Templates, and Chat. Phase 6 ports automations.
 
 Derived from [Razikus/supabase-nextjs-template](https://github.com/Razikus/supabase-nextjs-template).
 
@@ -29,9 +29,10 @@ The web app lives in `nextjs/`. Current dashboard surfaces:
 - Agents (`/agents`, table `user_agents`) — create/edit, attach `skill_ids`, set `defaults.model_id`, clone from a template
 - Skills Library (`/agent-skills`, table `agent_skills`, bucket `agent-skills`) — upload/list shared vs mine
 - Agent Templates (`/agent-templates`, table `agent_templates`) — published gallery; admin CRUD under Admin → Agent Templates
+- Chat (`/chat`, tables `chats` / `messages`) — OpenRouter threads, agent switcher, skills-as-context, attachments on the `files` bucket
 - User settings (profile, password, MFA, OpenRouter BYOK) and admin site settings + AI Docs model
 
-Chat and automations tables exist in the schema but have **no UI yet** (Phases 5–6). The starter ships **one** generic Starter Assistant recipe (no SEO/Ads seeds).
+Automations tables exist in the schema but have **no UI yet** (Phase 6). The starter ships **one** generic Starter Assistant recipe (no SEO/Ads seeds).
 
 `supabase-expo-template/` is an optional Expo sample. It is **not** part of the slim web starter path. Do not expand it for v1.
 
@@ -79,7 +80,7 @@ Details: [`supabase/README.md`](./supabase/README.md).
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `PRIVATE_SUPABASE_SERVICE_KEY` (this is the `service_role` secret; the app does not read `SUPABASE_SERVICE_ROLE_KEY`)
-   - `OPENROUTER_API_KEY` (needed for the document AI panel)
+   - `OPENROUTER_API_KEY` (needed for Documents AI and Chat)
    - `NEXT_PUBLIC_PRODUCTNAME`
 
    See [`nextjs/.env.template`](./nextjs/.env.template) for optional site, theme, SSO, pricing, and reserved `CRON_SECRET` keys. Composio keys are out of v1.
@@ -101,7 +102,7 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Browser + server Supabase clients |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Anon client + middleware |
 | `PRIVATE_SUPABASE_SERVICE_KEY` | Yes | `serverAdminClient` (service role) |
-| `OPENROUTER_API_KEY` | Yes for AI | Platform OpenRouter key (users may override with BYOK) |
+| `OPENROUTER_API_KEY` | Yes for AI | Platform OpenRouter key for Documents + Chat (users may override with BYOK) |
 | `NEXT_PUBLIC_PRODUCTNAME` | Yes | Title, header, footer, homepage |
 | `NEXT_PUBLIC_THEME` | No | Body theme class (default `theme-sass3`) |
 | `NEXT_PUBLIC_GOOGLE_TAG` | No | Google Analytics |

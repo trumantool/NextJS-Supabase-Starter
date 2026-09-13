@@ -212,11 +212,11 @@ If Eng prefers minimal churn from current starter, keep existing `files` for My 
 - [ ] Verification: create skill, clone template → user agent, assign skills.
 
 ### Phase 5 — General AI chat
-- [ ] Port chat UI + `chats`/`messages` APIs.
-- [ ] Wire OpenRouter generation path **without** Composio tool execution (skills-as-system-context is enough for v1).
-- [ ] Agent switcher; tags optional but tables exist if porting tags UI is cheap.
-- [ ] Chat attachments on `files` bucket.
-- [ ] Replace campaign empty-state copy with generic prompts.
+- [x] Port chat UI + `chats`/`messages` APIs.
+- [x] Wire OpenRouter generation path **without** Composio tool execution (skills-as-system-context is enough for v1).
+- [x] Agent switcher; tags optional but tables exist if porting tags UI is cheap.
+- [x] Chat attachments on `files` bucket.
+- [x] Replace campaign empty-state copy with generic prompts.
 - [ ] Verification: multi-turn chat; chat with agent that has skills; attachment upload.
 
 ### Phase 6 — Automations

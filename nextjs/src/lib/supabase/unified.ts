@@ -5,7 +5,7 @@ import {AGENT_SKILLS_BUCKET} from "@/lib/agent-skills";
 
 /**
  * My Files bucket. Objects live at `{userId}/{sanitizedFileName}`.
- * Chat attachments use the separate `files` bucket (Phase 5).
+ * Chat attachments use the separate `files` bucket.
  * Optional metadata can go in `user_files`; list/upload/delete talk to Storage.
  */
 export const USER_FILES_BUCKET = 'user-files'

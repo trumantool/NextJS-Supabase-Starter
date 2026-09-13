@@ -59,7 +59,7 @@ export default function AgentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Agents</h1>
           <p className="text-sm text-gray-500">
-            Your OpenRouter agents. Attach skills now; chat lands in Phase 5.
+            Your OpenRouter agents. Attach skills, then open Chat and switch to an agent.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

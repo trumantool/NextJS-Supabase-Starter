@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { SkillPicker } from '@/components/agents/SkillPicker'
+import { chatPathForAgent } from '@/lib/chat-agent'
 import { DEFAULT_AGENT_MODEL, modelIdFromDefaults } from '@/lib/agent-templates'
 import type { AgentSkillListItem } from '@/app/api/agent-skills/route'
 import type { UserAgent } from '@/lib/types'
@@ -129,15 +130,20 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
-        <Link href="/agents" className="text-sm text-blue-600 hover:underline">
-          ← Agents
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/agents" className="text-sm text-blue-600 hover:underline">
+            ← Agents
+          </Link>
+          <Link href={chatPathForAgent(agent.id)} className="text-sm text-blue-600 hover:underline">
+            Open in Chat
+          </Link>
+        </div>
         <h1 className="mt-2 text-2xl font-bold text-gray-900">Edit agent</h1>
         <p className="text-sm text-gray-500">
           {agent.source_template_name
             ? `Cloned from ${agent.source_template_name}.`
             : 'Custom agent.'}{' '}
-          Chat with this agent arrives in Phase 5.
+          Open Chat and switch to this agent to use its prompt and skills.
         </p>
       </div>
 

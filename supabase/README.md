@@ -28,7 +28,7 @@ npx supabase db push --linked
 | Bucket | Purpose |
 |---|---|
 | `user-files` | My Files UI. Object key is `{userId}/{sanitizedFileName}`. Folder markers from `handle_new_user` are hidden in the list. |
-| `files` | Chat attachments (`{userId}/chat-attachments/{chatId}/…`) — unused until Phase 5 |
+| `files` | Chat attachments (`{userId}/chat-attachments/{chatId}/…`) |
 | `agent-skills` | Skill markdown (`shared/` + `{userId}/`). Skills Library uploads here. |
 | `agent-memory` | Per-user agent memory (`{userId}/{agentId}/`). Folder is created when an agent is cloned. |
 

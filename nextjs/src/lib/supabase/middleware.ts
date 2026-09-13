@@ -46,6 +46,10 @@ export async function updateSession(request: NextRequest) {
         '/table',
         '/user-settings',
         '/admin',
+        '/chat',
+        '/agents',
+        '/agent-skills',
+        '/agent-templates',
     ]
     const isProtected = protectedPaths.some((p) =>
         request.nextUrl.pathname === p || request.nextUrl.pathname.startsWith(`${p}/`)

@@ -38,7 +38,7 @@ export const STARTER_TEMPLATE: Omit<
   name: 'Starter Assistant',
   slug: STARTER_TEMPLATE_SLUG,
   description:
-    'A general-purpose assistant. Clone it, then attach skills to specialize. Chat uses this recipe in Phase 5.',
+    'A general-purpose assistant. Clone it, then attach skills to specialize. Chat injects those skills as system context.',
   status: 'published',
   system_prompt:
     'You are a helpful workspace assistant. Follow any attached skills as instructions. Be concise, accurate, and ask a clarifying question when the request is ambiguous.',
