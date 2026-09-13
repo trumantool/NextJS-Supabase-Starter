@@ -220,10 +220,10 @@ If Eng prefers minimal churn from current starter, keep existing `files` for My 
 - [ ] Verification: multi-turn chat; chat with agent that has skills; attachment upload.
 
 ### Phase 6 — Automations
-- [ ] Port automations CRUD UI + `automations` / `automation_runs`.
-- [ ] Port schedule helpers + worker; secure cron with `CRON_SECRET`.
-- [ ] `vercel.json` cron entries — set a sensible wake cadence; document that wake ≠ execute if using queue pattern (see marketing-agent `docs/plans/automations.md` as reference only).
-- [ ] Run path: load skills + OpenRouter; **no** Composio integrations required; `allow_mutations` may remain as a future flag defaulting false.
+- [x] Port automations CRUD UI + `automations` / `automation_runs`.
+- [x] Port schedule helpers + worker; secure cron with `CRON_SECRET`.
+- [x] `vercel.json` cron entries — set a sensible wake cadence; document that wake ≠ execute if using queue pattern (see marketing-agent `docs/plans/automations.md` as reference only).
+- [x] Run path: load skills + OpenRouter; **no** Composio integrations required; `allow_mutations` may remain as a future flag defaulting false.
 - [ ] Verification: create automation, enqueue run, observe run history transcript.
 
 ### Phase 7 — Forkability polish

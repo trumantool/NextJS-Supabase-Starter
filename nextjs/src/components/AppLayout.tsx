@@ -9,7 +9,7 @@ import {
     X,
     ChevronDown,
     LogOut,
-    Key,     Files, LucideListTodo, FileText, Settings, ShieldCheck, Bot, BookOpen, LayoutTemplate, MessageSquare,
+    Key,     Files, LucideListTodo, FileText, Settings, ShieldCheck,     Bot, BookOpen, LayoutTemplate, MessageSquare, CalendarClock,
 } from 'lucide-react';
 import { useGlobal } from "@/lib/context/GlobalContext";
 import { createSPASassClient } from "@/lib/supabase/client";
@@ -54,6 +54,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { name: 'Agents', href: '/agents', icon: Bot },
         { name: 'Skills', href: '/agent-skills', icon: BookOpen },
         { name: 'Templates', href: '/agent-templates', icon: LayoutTemplate },
+        { name: 'Automations', href: '/automations', icon: CalendarClock },
         { name: 'User Settings', href: '/user-settings', icon: User },
     ];
 
