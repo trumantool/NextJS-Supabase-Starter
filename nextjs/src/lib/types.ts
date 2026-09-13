@@ -39,209 +39,202 @@ export type Database = {
   }
   public: {
     Tables: {
-      intake_assessments: {
+      admin_settings: {
         Row: {
           id: string
-          user_id: string
-          section_index: number
-          section_title: string
+          option_name: string
+          option_value: string
+          option_field_type: string
+          option_title: string
+          option_description: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
-          user_id: string
-          section_index: number
-          section_title: string
+          option_name: string
+          option_value?: string
+          option_field_type?: string
+          option_title: string
+          option_description?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
+          option_name?: string
+          option_value?: string
+          option_field_type?: string
+          option_title?: string
+          option_description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      agent_skills: {
+        Row: {
+          id: string
+          user_id: string | null
+          skill_name: string
+          skill_description: string | null
+          skill_url: string
+          source: string
+          source_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          skill_name: string
+          skill_description?: string | null
+          skill_url: string
+          source?: string
+          source_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          skill_name?: string
+          skill_description?: string | null
+          skill_url?: string
+          source?: string
+          source_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      agent_templates: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          description: string | null
+          status: string
+          system_prompt: string
+          skill_ids: string[]
+          required_toolkits: string[]
+          mcp_config: Json
+          memory_config: Json
+          defaults: Json
+          created_by: string
+          cloned_from_template_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          description?: string | null
+          status?: string
+          system_prompt?: string
+          skill_ids?: string[]
+          required_toolkits?: string[]
+          mcp_config?: Json
+          memory_config?: Json
+          defaults?: Json
+          created_by: string
+          cloned_from_template_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          description?: string | null
+          status?: string
+          system_prompt?: string
+          skill_ids?: string[]
+          required_toolkits?: string[]
+          mcp_config?: Json
+          memory_config?: Json
+          defaults?: Json
+          created_by?: string
+          cloned_from_template_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          key: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      automation_runs: {
+        Row: {
+          id: string
+          automation_id: string
+          user_id: string
+          trigger: string
+          status: string
+          error: string | null
+          output: string | null
+          started_at: string | null
+          finished_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          automation_id: string
+          user_id: string
+          trigger: string
+          status: string
+          error?: string | null
+          output?: string | null
+          started_at?: string | null
+          finished_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          automation_id?: string
           user_id?: string
-          section_index?: number
-          section_title?: string
+          trigger?: string
+          status?: string
+          error?: string | null
+          output?: string | null
+          started_at?: string | null
+          finished_at?: string | null
           created_at?: string
-          updated_at?: string
         }
         Relationships: []
       }
-      intake_responses: {
-        Row: {
-          id: string
-          assessment_id: string
-          question_number: number
-          question_text: string
-          section_title: string
-          audio_file_path: string | null
-          duration_seconds: number | null
-          recorded_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          assessment_id: string
-          question_number: number
-          question_text: string
-          section_title: string
-          audio_file_path?: string | null
-          duration_seconds?: number | null
-          recorded_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          assessment_id?: string
-          question_number?: number
-          question_text?: string
-          section_title?: string
-          audio_file_path?: string | null
-          duration_seconds?: number | null
-          recorded_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      public_intake_assessments: {
-        Row: {
-          id: string
-          session_id: string
-          email: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          session_id: string
-          email?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          session_id?: string
-          email?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      public_intake_responses: {
-        Row: {
-          id: string
-          assessment_id: string
-          question_number: number
-          question_text: string
-          section_title: string
-          audio_file_path: string | null
-          duration_seconds: number | null
-          recorded_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          assessment_id: string
-          question_number: number
-          question_text: string
-          section_title: string
-          audio_file_path?: string | null
-          duration_seconds?: number | null
-          recorded_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          assessment_id?: string
-          question_number?: number
-          question_text?: string
-          section_title?: string
-          audio_file_path?: string | null
-          duration_seconds?: number | null
-          recorded_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      audio_text_assessments: {
-        Row: {
-          id: string
-          user_id: string
-          section_index: number
-          section_title: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          section_index: number
-          section_title: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          section_index?: number
-          section_title?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      audio_text_responses: {
-        Row: {
-          id: string
-          assessment_id: string
-          question_number: number
-          question_text: string
-          section_title: string
-          transcript_text: string | null
-          audio_file_path: string | null
-          duration_seconds: number | null
-          recorded_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          assessment_id: string
-          question_number: number
-          question_text: string
-          section_title: string
-          transcript_text?: string | null
-          audio_file_path?: string | null
-          duration_seconds?: number | null
-          recorded_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          assessment_id?: string
-          question_number?: number
-          question_text?: string
-          section_title?: string
-          transcript_text?: string | null
-          audio_file_path?: string | null
-          duration_seconds?: number | null
-          recorded_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      text_assessments: {
+      automations: {
         Row: {
           id: string
           user_id: string
           name: string
+          prompt: string
+          status: string
+          frequency: string
+          timezone: string
+          local_time: string
+          weekday: number | null
+          monthday: number | null
+          month: number | null
+          once_on: string | null
+          next_run_at: string | null
+          allow_mutations: boolean
+          model_id: string
+          skill_ids: string[]
+          agent_id: string | null
           created_at: string
           updated_at: string
         }
@@ -249,6 +242,20 @@ export type Database = {
           id?: string
           user_id: string
           name: string
+          prompt: string
+          status?: string
+          frequency: string
+          timezone: string
+          local_time: string
+          weekday?: number | null
+          monthday?: number | null
+          month?: number | null
+          once_on?: string | null
+          next_run_at?: string | null
+          allow_mutations?: boolean
+          model_id?: string
+          skill_ids?: string[]
+          agent_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -256,44 +263,151 @@ export type Database = {
           id?: string
           user_id?: string
           name?: string
+          prompt?: string
+          status?: string
+          frequency?: string
+          timezone?: string
+          local_time?: string
+          weekday?: number | null
+          monthday?: number | null
+          month?: number | null
+          once_on?: string | null
+          next_run_at?: string | null
+          allow_mutations?: boolean
+          model_id?: string
+          skill_ids?: string[]
+          agent_id?: string | null
           created_at?: string
           updated_at?: string
         }
         Relationships: []
       }
-      text_assessment_answers: {
+      chat_tags: {
+        Row: {
+          chat_id: string
+          tag_id: string
+          created_at: string
+        }
+        Insert: {
+          chat_id: string
+          tag_id: string
+          created_at?: string
+        }
+        Update: {
+          chat_id?: string
+          tag_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      chats: {
         Row: {
           id: string
-          assessment_id: string
-          question_number: number
-          question_text: string
-          section_title: string
-          section_index: number
-          answer_text: string
+          user_id: string
+          title: string | null
+          model_id: string
+          agent_id: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
-          assessment_id: string
-          question_number: number
-          question_text: string
-          section_title: string
-          section_index?: number
-          answer_text?: string
+          user_id: string
+          title?: string | null
+          model_id?: string
+          agent_id?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
-          assessment_id?: string
-          question_number?: number
-          question_text?: string
-          section_title?: string
-          section_index?: number
-          answer_text?: string
+          user_id?: string
+          title?: string | null
+          model_id?: string
+          agent_id?: string | null
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      documents: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          template: string
+          doc_json: Json
+          model: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title?: string
+          template?: string
+          doc_json?: Json
+          model?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          template?: string
+          doc_json?: Json
+          model?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          id: string
+          chat_id: string
+          role: string
+          content: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          chat_id: string
+          role: string
+          content?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          chat_id?: string
+          role?: string
+          content?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
+      session_tags: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          color: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          color?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          color?: string | null
+          created_at?: string
         }
         Relationships: []
       }
@@ -330,91 +444,49 @@ export type Database = {
         }
         Relationships: []
       }
-      resumes: {
+      user_agents: {
         Row: {
           id: string
           user_id: string
-          title: string
-          template: string
-          doc_json: Json
-          model: string
+          name: string
+          source_template_id: string | null
+          source_template_name: string
+          system_prompt: string
+          skill_ids: string[]
+          required_toolkits: string[]
+          mcp_config: Json
+          memory_config: Json
+          defaults: Json
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          title?: string
-          template?: string
-          doc_json?: Json
-          model?: string
+          name: string
+          source_template_id?: string | null
+          source_template_name?: string
+          system_prompt?: string
+          skill_ids?: string[]
+          required_toolkits?: string[]
+          mcp_config?: Json
+          memory_config?: Json
+          defaults?: Json
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           user_id?: string
-          title?: string
-          template?: string
-          doc_json?: Json
-          model?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      app_settings: {
-        Row: {
-          key: string
-          value: Json
-        }
-        Insert: {
-          key: string
-          value: Json
-        }
-        Update: {
-          key?: string
-          value?: Json
-        }
-        Relationships: []
-      }
-      contact_submissions: {
-        Row: {
-          id: string
-          first_name: string
-          last_name: string
-          email_address: string
-          phone_number: string | null
-          message: string
-          user_id: string | null
-          status: string
-          source: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          first_name: string
-          last_name: string
-          email_address: string
-          phone_number?: string | null
-          message: string
-          user_id?: string | null
-          status?: string
-          source?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          first_name?: string
-          last_name?: string
-          email_address?: string
-          phone_number?: string | null
-          message?: string
-          user_id?: string | null
-          status?: string
-          source?: string
+          name?: string
+          source_template_id?: string | null
+          source_template_name?: string
+          system_prompt?: string
+          skill_ids?: string[]
+          required_toolkits?: string[]
+          mcp_config?: Json
+          memory_config?: Json
+          defaults?: Json
           created_at?: string
           updated_at?: string
         }
@@ -450,12 +522,73 @@ export type Database = {
         }
         Relationships: []
       }
+      user_files: {
+        Row: {
+          id: string
+          user_id: string
+          file_id: string
+          file_name: string
+          file_description: string | null
+          tags: string[] | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          file_id: string
+          file_name: string
+          file_description?: string | null
+          tags?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          file_id?: string
+          file_name?: string
+          file_description?: string | null
+          tags?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          slug: string
+          display_name: string
+          sort_order: number
+          is_system: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          slug: string
+          display_name: string
+          sort_order?: number
+          is_system?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          slug?: string
+          display_name?: string
+          sort_order?: number
+          is_system?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           user_id: string
           first_name: string | null
           last_name: string | null
           email: string | null
+          openrouter_api_key: string | null
           created_at: string
           updated_at: string
         }
@@ -464,6 +597,7 @@ export type Database = {
           first_name?: string | null
           last_name?: string | null
           email?: string | null
+          openrouter_api_key?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -472,39 +606,7 @@ export type Database = {
           first_name?: string | null
           last_name?: string | null
           email?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      admin_settings: {
-        Row: {
-          id: string
-          option_name: string
-          option_value: string
-          option_field_type: string
-          option_title: string
-          option_description: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          option_name: string
-          option_value?: string
-          option_field_type?: string
-          option_title: string
-          option_description?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          option_name?: string
-          option_value?: string
-          option_field_type?: string
-          option_title?: string
-          option_description?: string | null
+          openrouter_api_key?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -515,7 +617,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      enqueue_automation_run: {
+        Args: {
+          p_automation_id: string
+          p_trigger: string
+          p_next_run_at: string | null
+          p_new_status: string
+        }
+        Returns: string
+      }
+      claim_queued_automation_runs: {
+        Args: { p_limit?: number }
+        Returns: {
+          id: string
+          automation_id: string
+          user_id: string
+          trigger: string
+          status: string
+          error: string | null
+          output: string | null
+          started_at: string | null
+          finished_at: string | null
+          created_at: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
@@ -651,3 +776,12 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
+/** Temporary alias while Phase 3 renames resume-builder → documents. */
+export type ResumeRow = Database['public']['Tables']['documents']['Row']
+export type Document = Database['public']['Tables']['documents']['Row']
+export type Automation = Database['public']['Tables']['automations']['Row']
+export type AutomationRun = Database['public']['Tables']['automation_runs']['Row']
+export type AgentSkill = Database['public']['Tables']['agent_skills']['Row']
+export type AgentTemplate = Database['public']['Tables']['agent_templates']['Row']
+export type UserAgent = Database['public']['Tables']['user_agents']['Row']

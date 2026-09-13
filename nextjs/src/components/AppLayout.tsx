@@ -9,7 +9,7 @@ import {
     X,
     ChevronDown,
     LogOut,
-    Key, Files, LucideListTodo, Mic, FileText, Settings, Mail, ShieldCheck, Inbox, ClipboardList,
+    Key, Files, LucideListTodo, FileText, Settings, ShieldCheck,
 } from 'lucide-react';
 import { useGlobal } from "@/lib/context/GlobalContext";
 import { createSPASassClient } from "@/lib/supabase/client";
@@ -45,22 +45,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     const productName = process.env.NEXT_PUBLIC_PRODUCTNAME;
 
+    // Phase 1: hide assessment/contact product surfaces. Chat/agents/automations
+    // land in Phases 4–6. Resume Builder stays until Phase 3 Documents rename.
     const navigation = [
         { name: 'Home', href: '/dashboard', icon: Home },
-        { name: 'Intake Assessment', href: '/audio-text-assessment', icon: Mic },
-        { name: 'My Assessments', href: '/my-assessments', icon: ClipboardList },
         { name: 'Resume Builder', href: '/resume-builder', icon: FileText },
         { name: 'My Files', href: '/storage', icon: Files },
         { name: 'To Do Lists', href: '/table', icon: LucideListTodo },
         { name: 'User Settings', href: '/user-settings', icon: User },
-        { name: 'Contact', href: '/contact', icon: Mail },
     ];
 
     // Admin submenu (only visible to admins)
     const adminMenuItems = isAdmin
         ? [
             { name: 'Admin Settings', href: '/admin', icon: Settings },
-            { name: 'Submissions', href: '/admin/submissions', icon: Inbox },
           ]
         : [];
 

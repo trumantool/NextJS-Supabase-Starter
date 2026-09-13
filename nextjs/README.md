@@ -2,7 +2,7 @@
 
 This is the web app for the starter. Run everything from this directory.
 
-Full fork setup (new empty Supabase project, schema apply, env keys) lives in the [root README](../README.md).
+Full fork setup (new empty Supabase project, migrations, env keys) lives in the [root README](../README.md). Prefer `npx supabase db push --linked` from the repo root; [`supabase/schema.sql`](../supabase/schema.sql) is the consolidated view of the same baseline.
 
 ## Local
 

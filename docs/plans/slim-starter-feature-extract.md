@@ -182,11 +182,11 @@ If Eng prefers minimal churn from current starter, keep existing `files` for My 
 - [x] Confirm Cursor cloud agent access to `trumantool/NextJS-Supabase-Starter` (expected OK). Escalate if blocked.
 
 ### Phase 1 — Schema slim + prune dead product
-- [ ] Rewrite `supabase/schema.sql` to keep-only tables/buckets/RLS listed above.
-- [ ] Replace `resumes` with `documents` (migration path for empty starter: drop resume table if unused in forks).
-- [ ] Remove assessment/contact tables from schema; remove or hide their routes from AppLayout.
-- [ ] Update `nextjs/src/lib/types.ts` to match schema (fix audio drift).
-- [ ] Seed `handle_new_user` for `user-files` / `agent-skills` folders as needed.
+- [x] Rewrite `supabase/schema.sql` to keep-only tables/buckets/RLS listed above.
+- [x] Replace `resumes` with `documents` (migration path for empty starter: drop resume table if unused in forks).
+- [x] Remove assessment/contact tables from schema; remove or hide their routes from AppLayout.
+- [x] Update `nextjs/src/lib/types.ts` to match schema (fix audio drift).
+- [x] Seed `handle_new_user` for `user-files` / `agent-skills` folders as needed.
 - [ ] Verification: apply schema to a throwaway Supabase project; no errors; RLS smoke via anon/authenticated.
 
 ### Phase 2 — Keep surfaces harden (files, todos, settings)

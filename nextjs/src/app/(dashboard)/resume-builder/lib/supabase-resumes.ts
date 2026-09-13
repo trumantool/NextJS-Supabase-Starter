@@ -1,4 +1,6 @@
 // Resume Builder — Supabase CRUD helpers.
+// Phase 1: persist to `documents` (resumes table is gone). Phase 3 owns the
+// Documents UX rename; these helpers keep Resume* names as a temporary alias.
 // Reuses the existing server client from @/lib/supabase/server.
 // NOTE: The repo's Database generic does not fully resolve table types, so we
 // follow the existing codebase convention of casting queries with `as any`.
@@ -10,7 +12,7 @@ import type { ResumeInsert, ResumeMeta, ResumeUpdate } from './types'
 export async function listResumes(): Promise<ResumeMeta[]> {
   const supabase = await createSSRClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const query = supabase.from('resumes').select('*').order('updated_at', { ascending: false }) as any
+  const query = supabase.from('documents').select('*').order('updated_at', { ascending: false }) as any
   const { data, error } = await query
 
   if (error) throw new Error(error.message)
@@ -21,7 +23,7 @@ export async function listResumes(): Promise<ResumeMeta[]> {
 export async function getResume(id: string): Promise<ResumeMeta | null> {
   const supabase = await createSSRClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const query = supabase.from('resumes').select('*').eq('id', id).maybeSingle() as any
+  const query = supabase.from('documents').select('*').eq('id', id).maybeSingle() as any
   const { data, error } = await query
 
   if (error) throw new Error(error.message)
@@ -32,7 +34,7 @@ export async function getResume(id: string): Promise<ResumeMeta | null> {
 export async function createResume(input: ResumeInsert): Promise<ResumeMeta> {
   const supabase = await createSSRClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const query = supabase.from('resumes').insert(input).select().single() as any
+  const query = supabase.from('documents').insert(input).select().single() as any
   const { data, error } = await query
 
   if (error) throw new Error(error.message)
@@ -43,7 +45,7 @@ export async function createResume(input: ResumeInsert): Promise<ResumeMeta> {
 export async function updateResume(id: string, input: ResumeUpdate): Promise<ResumeMeta> {
   const supabase = await createSSRClient()
   const query = supabase
-    .from('resumes')
+    .from('documents')
     .update({ ...input, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
@@ -58,7 +60,7 @@ export async function updateResume(id: string, input: ResumeUpdate): Promise<Res
 export async function deleteResume(id: string): Promise<void> {
   const supabase = await createSSRClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const query = supabase.from('resumes').delete().eq('id', id) as any
+  const query = supabase.from('documents').delete().eq('id', id) as any
   const { error } = await query
   if (error) throw new Error(error.message)
 }

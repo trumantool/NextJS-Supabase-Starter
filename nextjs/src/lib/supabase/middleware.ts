@@ -39,9 +39,6 @@ export async function updateSession(request: NextRequest) {
     // which adds no URL segment, so we match on the concrete paths explicitly.
     const protectedPaths = [
         '/dashboard',
-        '/intake',
-        '/audio-text-assessment',
-        '/my-assessments',
         '/resume-builder',
         '/storage',
         '/table',
