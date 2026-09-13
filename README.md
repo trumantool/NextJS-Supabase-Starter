@@ -1,214 +1,142 @@
-# Supabase Full-Stack SaaS Template
+# Next.js + Supabase Starter
 
-A production-ready SaaS template built with Next.js 15, Supabase, and Tailwind CSS. This template provides everything you need to quickly launch your SaaS product, including authentication, user management, file storage, and more.
+Reusable Next.js 15 + Supabase SaaS starter. This repo is being slimmed to keep auth, file uploads, documents + AI editing, todos, generic AI chat/agents/skills, automations, and the user/admin settings those need.
 
+The keep / port / drop plan is in [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md). Phase 0 is repo hygiene (this README, env template, schema apply docs). Later phases slim the schema and port chat/agents/automations.
 
-> **🎉 NEW: Mobile App Now Available!** Check out [README_MOBILE.md](./README_MOBILE.md) for the complete React Native + Expo mobile app that shares the same Supabase backend!
-> https://youtube.com/shorts/qcASa0Ywsy4?feature=share
+Derived from [Razikus/supabase-nextjs-template](https://github.com/Razikus/supabase-nextjs-template).
 
+## Never reuse Marketing Agent infrastructure
 
-## 🇨🇳 Chinese Documentation Available
+Create a **new empty** Supabase project (and later a **new** Vercel project) for every fork.
 
-[中文文档](./README_ZH.md) | [移动端中文文档](./README_MOBILE_ZH.md)
+Do **not** use:
 
-This repository includes full documentation in Simplified Chinese:
-- **README_ZH.md** - Complete Chinese translation of the main documentation
-- **README_MOBILE_ZH.md** - Complete Chinese translation of the mobile app documentation
+- Marketing Agent database project ID `glplvrljdgowcwuubkau`
+- Vercel project `marketing-agent-truman`
+- Any keys, URLs, or project refs copied from those projects
 
-本仓库包含完整的简体中文文档：
-- **README_ZH.md** - 主文档的完整中文翻译
-- **README_MOBILE_ZH.md** - 移动应用文档的完整中文翻译
+Do not write to `trumantool/marketing-agent` or `onhprojects/supabase-nextjs-starter`. Those repos are reference-only.
 
-## LIVE DEMO
+## What exists today
 
-Demo is here - https://basicsass.razikus.com
+The web app lives in `nextjs/`. Current dashboard surfaces:
 
+- Authentication (email/password, MFA)
+- File uploads (`files` bucket)
+- To-dos (`todo_list`)
+- Resume-era TipTap + OpenRouter editor (`/resume-builder`, table `resumes`) — Phase 3 renames this to Documents
+- User settings and admin site settings
 
-## Self promo
-Hey, don't be a code printer in AI era. Check my book
-```
-http://razikus.gumroad.com/l/dirtycode - live now!
-https://www.amazon.com/dp/B0FNR716CF - live from 01.09
-https://books.apple.com/us/book/dirty-code-but-works/id6751538660 - live from 01.09
-https://play.google.com/store/books/details?id=5UWBEQAAQBAJ - live from 01.09
-```
+Chat, agents, skills, and automations are **not** in the app yet (Phases 4–6).
 
-## Deployment video
+`supabase-expo-template/` is an optional Expo sample. It is **not** part of the slim web starter path. Do not expand it for v1.
 
-Video is here - https://www.youtube.com/watch?v=kzbXavLndmE
+## Schema for v1 — apply `schema.sql` once
 
-## Migration from auth schema
+There is **no** `supabase/migrations/` directory. `npx supabase migrations up` will not work.
 
-According to this - https://github.com/Razikus/supabase-nextjs-template/issues/4
+On a **new empty** Supabase project, apply the current baseline once:
 
-We are no longer able to modify auth schema. I modified original migrations to rename it to custom schema. If you need to migrate from older version - check supabase/migrations_for_old/20250525183944_auth_removal.sql
+1. Open the project in the [Supabase Dashboard](https://supabase.com/dashboard)
+2. Go to **SQL Editor**
+3. Paste and run [`supabase/schema.sql`](./supabase/schema.sql)
 
-## 🚀 Features
+That dump is idempotent (`IF NOT EXISTS` / `DROP IF EXISTS`) and includes the tables, RLS, triggers, storage buckets (`files`, `resumes`), and seed rows the current app expects.
 
-- **Authentication**
-    - Email/Password authentication
-    - Multi-factor authentication (MFA) support
-    - OAuth/SSO integration ready
-    - Password reset and email verification
+Phase 1 will rewrite `schema.sql` to the keep-only model and introduce real `supabase/migrations/` from that slim baseline. Do not treat the current dump as the long-term migration history.
 
-- **User Management**
-    - User profiles and settings
-    - Secure password management
-    - Session handling
+Details: [`supabase/README.md`](./supabase/README.md).
 
-- **File Management Demo (2FA ready)**
-    - Secure file upload and storage
-    - File sharing capabilities
-    - Drag-and-drop interface
-    - Progress tracking
+## Local setup
 
-- **Task Management Demo (2FA ready)**
-    - CRUD operations example
-    - Real-time updates
-    - Filtering and sorting
-    - Row-level security
+1. Fork or clone this repository.
 
-- **Security**
-    - Row Level Security (RLS) policies
-    - Secure file storage policies
-    - Protected API routes
-    - MFA implementation
+2. Create a **new empty** Supabase project (not Marketing Agent).
 
-- **UI/UX**
-    - Modern, responsive design
-    - Dark mode support
-    - Loading states
-    - Error handling
-    - Toast notifications
-    - Confetti animations
+3. Apply [`supabase/schema.sql`](./supabase/schema.sql) once in the SQL Editor (see above).
 
-- **Legal & Compliance**
-    - Privacy Policy template
-    - Terms of Service template
-    - Refund Policy template
-    - GDPR-ready cookie consent
+4. From **Project Settings → API**, copy:
+   - Project URL
+   - `anon` `public` key
+   - `service_role` key (server-only)
 
-## 🛠️ Tech Stack
+5. In the Supabase Auth settings, set **Site URL** to `http://localhost:3000` and add `http://localhost:3000/**` to redirect URLs. `supabase/config.toml` already uses those values for local CLI work; hosted projects must be set in the dashboard.
 
-- **Frontend**
-    - Next.js 15 (App Router)
-    - React 19
-    - Tailwind CSS
-    - shadcn/ui components
-    - Lucide icons
+6. Install and configure the Next.js app:
 
-- **Backend**
-    - Supabase
-    - PostgreSQL
-    - Row Level Security
-    - Storage Buckets
+   ```bash
+   cd nextjs
+   npm install
+   cp .env.template .env.local
+   ```
 
-- **Authentication**
-    - Supabase Auth
-    - MFA support
-    - OAuth providers
+7. Fill `nextjs/.env.local` from your **new** project. Required keys:
 
-## 📦 Getting Started - local dev
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `PRIVATE_SUPABASE_SERVICE_KEY` (this is the `service_role` secret; the app does not read `SUPABASE_SERVICE_ROLE_KEY`)
+   - `OPENROUTER_API_KEY` (needed for the document AI panel)
+   - `NEXT_PUBLIC_PRODUCTNAME`
 
-1. Fork or clone repository
-2. Prepare Supabase Project URL (Project URL from `Project Settings` -> `API` -> `Project URL`)
-3. Prepare Supabase Anon and Service Key (`Anon Key`, `Service Key` from `Project Settings` -> `API` -> `anon public` and `service_role`)
-4. Prepare Supabase Database Password  (You can reset it inside `Project Settings` -> `Database` -> `Database Password`)
-5. If you already know your app url -> adjust supabase/config.toml `site_url` and `additional_redirect_urls`, you can do it later
-6. Run following commands (inside root of forked / downloaded repository):
+   See [`nextjs/.env.template`](./nextjs/.env.template) for optional site, theme, SSO, pricing, and reserved `CRON_SECRET` keys. Composio keys are out of v1.
 
-```bash
-# Login to supabase
-npx supabase login
-# Link project to supabase (require database password) - you will get selector prompt
-npx supabase link
+8. Run the app from `nextjs/`:
 
-# Send config to the server - may require confirmation (y)
-npx supabase config push
+   ```bash
+   npm run dev
+   ```
 
-# Up migrations
-npx supabase migrations up --linked
+9. Open [http://localhost:3000](http://localhost:3000).
 
-```
+## Environment variables
 
-7. Go to next/js folder and run `yarn`
-8. Copy .env.template to .env.local
-9. Adjust .env.local
-```
-NEXT_PUBLIC_SUPABASE_URL=https://APIURL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=ANONKEY
-PRIVATE_SUPABASE_SERVICE_KEY=SERVICEROLEKEY
+Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified against `process.env` / `NEXT_PUBLIC_` under `nextjs/`.
 
-```
-10. Run yarn dev
-11. Go to http://localhost:3000 🎉
+| Variable | Required | Used for |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Browser + server Supabase clients |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Anon client + middleware |
+| `PRIVATE_SUPABASE_SERVICE_KEY` | Yes | `serverAdminClient` (service role) |
+| `OPENROUTER_API_KEY` | Yes for AI | Resume/document OpenRouter client |
+| `NEXT_PUBLIC_PRODUCTNAME` | Yes | Title, header, footer, homepage |
+| `NEXT_PUBLIC_THEME` | No | Body theme class (default `theme-sass3`) |
+| `NEXT_PUBLIC_GOOGLE_TAG` | No | Google Analytics |
+| `NEXT_PUBLIC_SSO_PROVIDERS` | No | Comma list: `github`, `google`, `facebook`, `apple` |
+| `NEXT_PUBLIC_TIERS_*` / `NEXT_PUBLIC_POPULAR_TIER` / `NEXT_PUBLIC_COMMON_FEATURES` | No | Homepage pricing demo |
+| `CRON_SECRET` | Reserved | Phase 6 automations cron/worker (not read yet) |
 
-## 🚀 Getting Started - deploy to vercel
+`NODE_ENV` is set by Next.js. Do not set `OPENROUTER_API_KEY_REACHTHEMAI` (legacy fallback only).
 
-1. Fork or clone repository
-2. Create project in Vercel - choose your repo
-3. Paste content of .env.local into environment variables
-4. Click deploy
-5. Adjust in supabase/config.toml site_url and additional_redirect_urls (important in additional_redirect_urls is to have https://YOURURL/** - these 2 **)
-6. Done!
+## Deploy (later — not provisioned by this repo)
 
-## 📄 Legal Documents
+When you deploy, create a **new** Vercel project pointed at this repo. Set the same keys from `nextjs/.env.local` as Vercel environment variables. Update Supabase Auth site URL and redirect URLs to the production origin (`https://YOUR_DOMAIN/**`).
 
-The template includes customizable legal documents - these are in markdown, so you can adjust them as you see fit:
+Do not attach Marketing Agent’s Vercel project or database.
 
-- Privacy Policy (`/public/terms/privacy-notice.md`)
-- Terms of Service (`/public/terms/terms-of-service.md`)
-- Refund Policy (`/public/terms/refund-policy.md`)
+## Docs that are **not** in this repo
 
-## 🎨 Theming
+The previous README claimed files that are not present. Do not look for:
 
-The template includes several pre-built themes:
-- `theme-sass` (Default)
-- `theme-blue`
-- `theme-purple`
-- `theme-green`
+- `README_ZH.md` / `README_MOBILE_ZH.md` — not in this repository
+- `supabase/migrations/` — not present (v1 applies `schema.sql`)
+- `supabase/migrations_for_old/` — not present
+- Root `.env.template` — the template is `nextjs/.env.template`
 
-Change the theme by updating the `NEXT_PUBLIC_THEME` environment variable.
+`README_MOBILE.md` describes the optional Expo folder only.
 
-## 🤝 Contributing
+## Legal documents
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Markdown templates used by the web app:
 
+- `nextjs/public/terms/privacy-notice.md`
+- `nextjs/public/terms/terms-of-service.md`
+- `nextjs/public/terms/refund-policy.md`
 
-## Need Multitenancy, Billing (Paddle) and Role Based Access Control?
+## Theming
 
-I have paid template as well available here:
+Set `NEXT_PUBLIC_THEME` to one of: `theme-sass`, `theme-sass2`, `theme-sass3` (default), `theme-blue`, `theme-purple`, `theme-green`.
 
-https://sasstemplate.razikus.com
+## License
 
-Basically it's the same template but with Paddle + organisations API keys + multiple organisations + Role Based Access Control
-
-For code GITHUB you can get -50% off
-
-https://razikus.gumroad.com/l/supatemplate/GITHUB
-
-## 📝 License
-
-This project is licensed under the Apache License - see the LICENSE file for details.
-
-## 💪 Support
-
-If you find this template helpful, please consider giving it a star ⭐️
-
-Or buy me a coffee!
-
-- [BuyMeACoffee](https://buymeacoffee.com/razikus)
-
-My socials:
-
-- [Twitter](https://twitter.com/Razikus_)
-- [GitHub](https://github.com/Razikus)
-- [Website](https://www.razikus.com)
-
-
-## 🙏 Acknowledgments
-
-- [Next.js](https://nextjs.org/)
-- [Supabase](https://supabase.com/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [shadcn/ui](https://ui.shadcn.com/)
+Apache License — see [LICENSE](./LICENSE).
