@@ -499,6 +499,12 @@ export type Database = {
           first_name: string | null
           last_name: string | null
           email: string | null
+          twitter_url: string | null
+          linkedin_url: string | null
+          github_url: string | null
+          instagram_url: string | null
+          youtube_url: string | null
+          website_url: string | null
           created_at: string
           updated_at: string
         }
@@ -508,6 +514,12 @@ export type Database = {
           first_name?: string | null
           last_name?: string | null
           email?: string | null
+          twitter_url?: string | null
+          linkedin_url?: string | null
+          github_url?: string | null
+          instagram_url?: string | null
+          youtube_url?: string | null
+          website_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -517,6 +529,12 @@ export type Database = {
           first_name?: string | null
           last_name?: string | null
           email?: string | null
+          twitter_url?: string | null
+          linkedin_url?: string | null
+          github_url?: string | null
+          instagram_url?: string | null
+          youtube_url?: string | null
+          website_url?: string | null
           created_at?: string
           updated_at?: string
         }

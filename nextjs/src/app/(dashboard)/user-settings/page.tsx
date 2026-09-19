@@ -7,6 +7,7 @@ import { createSPASassClientAuthenticated as createSPASassClient } from '@/lib/s
 import { Key, User, CheckCircle } from 'lucide-react';
 import { MFASetup } from '@/components/MFASetup';
 import { ByokSettingsCard } from '@/components/ByokSettingsCard';
+import { SocialProfileSettingsCard } from '@/components/SocialProfileSettingsCard';
 
 export default function UserSettingsPage() {
     const { user } = useGlobal();
@@ -100,6 +101,8 @@ export default function UserSettingsPage() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    <SocialProfileSettingsCard />
 
                     <Card>
                         <CardHeader>
