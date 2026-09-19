@@ -137,6 +137,14 @@ export function emptySocialProfileValues(
   return values
 }
 
+export function assertProfileRowUpdated(
+  row: { user_id?: string } | null | undefined
+): void {
+  if (!row?.user_id) {
+    throw new Error('Profile not found')
+  }
+}
+
 export function socialProfileValuesFromRow(
   row: Record<string, unknown> | null | undefined,
   columns: readonly SocialProfileColumn[]

@@ -6,6 +6,7 @@ import {
 
 function statusForError(message: string): number {
   if (message === 'Unauthorized') return 401
+  if (message === 'Profile not found') return 404
   if (
     message === 'Social profile columns are not available' ||
     message.includes('must be a valid http(s) URL') ||

@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import {
   SOCIAL_PROFILE_COLUMNS,
   SOCIAL_PROFILE_FIELDS,
+  assertProfileRowUpdated,
   buildSocialProfileUpdate,
   isUndefinedColumnError,
   socialColumnsFromInformationSchema,
@@ -133,6 +134,17 @@ describe('validateSocialProfileUrl', () => {
     assert.equal(validateSocialProfileUrl('github_url', 'javascript:alert(1)').ok, false)
     assert.equal(validateSocialProfileUrl('linkedin_url', 'not-a-url').ok, false)
     assert.equal(validateSocialProfileUrl('instagram_url', 'ftp://files.example').ok, false)
+  })
+})
+
+describe('assertProfileRowUpdated', () => {
+  it('rejects a missing user_data row so save cannot silently no-op', () => {
+    assert.throws(() => assertProfileRowUpdated(null), /Profile not found/)
+    assert.throws(() => assertProfileRowUpdated({}), /Profile not found/)
+  })
+
+  it('accepts an updated row for the current user', () => {
+    assert.doesNotThrow(() => assertProfileRowUpdated({ user_id: 'abc' }))
   })
 })
 

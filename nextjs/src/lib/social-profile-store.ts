@@ -3,8 +3,10 @@ import {
   SOCIAL_PROFILE_COLUMNS,
   buildSocialProfileUpdate,
   isUndefinedColumnError,
+  socialColumnsFromRow,
   socialColumnsFromSchemaQuery,
   socialProfileValuesFromRow,
+  assertProfileRowUpdated,
   type SocialProfileColumn,
   type SocialProfileValues,
 } from '@/lib/social-profile'
@@ -86,32 +88,57 @@ async function listExistingSocialColumns(
 
 export async function getSocialProfileForCurrentUser(): Promise<SocialProfileState> {
   const { supabase, user } = await requireAuthenticatedClient()
-  const columns = await listExistingSocialColumns(supabase)
+  const fromSchema = await listSocialColumnsFromInformationSchema(
+    supabase as unknown as InformationSchemaClient
+  )
 
-  if (columns.length === 0) {
-    return { columns: [], values: {} }
+  if (fromSchema) {
+    if (fromSchema.length === 0) {
+      return { columns: [], values: {} }
+    }
+
+    const { data, error } = await supabase
+      .from('user_data')
+      .select(fromSchema.join(','))
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (error) {
+      if (isUndefinedColumnError(error)) {
+        return { columns: [], values: {} }
+      }
+      throw new Error(error.message)
+    }
+
+    return {
+      columns: fromSchema,
+      values: socialProfileValuesFromRow(
+        data as Record<string, unknown> | null,
+        fromSchema
+      ),
+    }
   }
 
   const { data, error } = await supabase
     .from('user_data')
-    .select(columns.join(','))
+    .select('*')
     .eq('user_id', user.id)
     .maybeSingle()
 
   if (error) {
-    if (isUndefinedColumnError(error)) {
-      return { columns: [], values: {} }
-    }
     throw new Error(error.message)
   }
 
-  return {
-    columns,
-    values: socialProfileValuesFromRow(
-      data as Record<string, unknown> | null,
-      columns
-    ),
+  if (data) {
+    const columns = socialColumnsFromRow(data as Record<string, unknown>)
+    return {
+      columns,
+      values: socialProfileValuesFromRow(data as Record<string, unknown>, columns),
+    }
   }
+
+  const columns = await listSocialColumnsByProbe(supabase)
+  return { columns, values: {} }
 }
 
 export async function updateSocialProfileForCurrentUser(
@@ -128,10 +155,12 @@ export async function updateSocialProfileForCurrentUser(
     return { success: true, values: built.value }
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('user_data')
     .update(built.value)
     .eq('user_id', user.id)
+    .select('user_id')
+    .maybeSingle()
 
   if (error) {
     if (isUndefinedColumnError(error)) {
@@ -140,5 +169,6 @@ export async function updateSocialProfileForCurrentUser(
     throw new Error(error.message)
   }
 
+  assertProfileRowUpdated(data)
   return { success: true, values: built.value }
 }

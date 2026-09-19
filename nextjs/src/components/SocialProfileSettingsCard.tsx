@@ -89,7 +89,7 @@ export function SocialProfileSettingsCard() {
             <Globe className="h-5 w-5" />
             Social profiles
           </CardTitle>
-          <CardDescription>Optional public profile links</CardDescription>
+          <CardDescription>Optional profile links on your account</CardDescription>
         </CardHeader>
         <CardContent>
           <Alert variant="destructive">
@@ -112,8 +112,8 @@ export function SocialProfileSettingsCard() {
           Social profiles
         </CardTitle>
         <CardDescription>
-          Optional public links. These fields appear only when the matching
-          columns exist on your user profile table.
+          Optional links on your account. These fields appear only when the
+          matching columns exist on your user profile table.
         </CardDescription>
       </CardHeader>
       <CardContent>
