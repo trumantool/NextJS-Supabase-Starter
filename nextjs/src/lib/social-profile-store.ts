@@ -3,7 +3,7 @@ import {
   SOCIAL_PROFILE_COLUMNS,
   buildSocialProfileUpdate,
   isUndefinedColumnError,
-  socialColumnsFromInformationSchema,
+  socialColumnsFromSchemaQuery,
   socialProfileValuesFromRow,
   type SocialProfileColumn,
   type SocialProfileValues,
@@ -53,8 +53,7 @@ async function listSocialColumnsFromInformationSchema(
       .eq('table_schema', 'public')
       .eq('table_name', 'user_data')
 
-    if (error || !data) return null
-    return socialColumnsFromInformationSchema(data)
+    return socialColumnsFromSchemaQuery(data, error)
   } catch {
     return null
   }

@@ -38,6 +38,19 @@ export function socialColumnsFromInformationSchema(
   return SOCIAL_PROFILE_COLUMNS.filter((column) => names.has(column))
 }
 
+/**
+ * Interpret an information_schema.columns query.
+ * Returns null when the query did not produce a usable schema snapshot so
+ * callers can fall back to a PostgREST column probe.
+ */
+export function socialColumnsFromSchemaQuery(
+  rows: Array<{ column_name: string }> | null | undefined,
+  error?: { code?: string; message?: string } | null
+): SocialProfileColumn[] | null {
+  if (error || !rows || rows.length === 0) return null
+  return socialColumnsFromInformationSchema(rows)
+}
+
 export function socialColumnsFromRow(
   row: Record<string, unknown> | null | undefined
 ): SocialProfileColumn[] {

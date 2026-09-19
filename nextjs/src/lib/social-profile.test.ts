@@ -7,6 +7,7 @@ import {
   isUndefinedColumnError,
   socialColumnsFromInformationSchema,
   socialColumnsFromRow,
+  socialColumnsFromSchemaQuery,
   validateSocialProfileUrl,
 } from './social-profile.ts'
 
@@ -49,6 +50,29 @@ describe('socialColumnsFromInformationSchema', () => {
     ])
 
     assert.deepEqual(present, [])
+  })
+})
+
+describe('socialColumnsFromSchemaQuery', () => {
+  it('falls back when the schema query errors or returns no rows', () => {
+    assert.equal(
+      socialColumnsFromSchemaQuery([{ column_name: 'twitter_url' }], {
+        message: 'permission denied',
+      }),
+      null
+    )
+    assert.equal(socialColumnsFromSchemaQuery([], null), null)
+    assert.equal(socialColumnsFromSchemaQuery(null, null), null)
+  })
+
+  it('treats a non-empty schema snapshot as authoritative', () => {
+    assert.deepEqual(
+      socialColumnsFromSchemaQuery(
+        [{ column_name: 'first_name' }, { column_name: 'github_url' }],
+        null
+      ),
+      ['github_url']
+    )
   })
 })
 
