@@ -1245,7 +1245,8 @@ VALUES
   ('support_hours', '', 'text', 'Support Hours', 'Available as the [support_hours] shortcode.'),
   ('phone_number', '', 'text', 'Phone Number', 'Available as the [phone_number] shortcode.'),
   ('privacy_policy', '<h1>Privacy Policy</h1><p>This Privacy Policy explains how [site_title] ("we", "us", or "our") collects, uses, discloses, and safeguards your information when you use our services.</p>', 'textarea', 'Privacy Policy', 'The privacy policy content shown on the /privacy page. Supports shortcodes like [site_title], [company_name], and [support_email].'),
-  ('terms_of_service', '<h1>Terms of Service</h1><p>Welcome to [site_title] ("we", "us", or "our"). By accessing or using our services, you agree to be bound by these Terms of Service.</p>', 'textarea', 'Terms of Service', 'The Terms of Service content shown on the /terms page. Supports shortcodes like [site_title], [company_name], and [support_email].');
+  ('terms_of_service', '<h1>Terms of Service</h1><p>Welcome to [site_title] ("we", "us", or "our"). By accessing or using our services, you agree to be bound by these Terms of Service.</p>', 'textarea', 'Terms of Service', 'The Terms of Service content shown on the /terms page. Supports shortcodes like [site_title], [company_name], and [support_email].'),
+  ('login_redirect_url', 'https://nextjs-supabase-starter-two.vercel.app', 'text', 'Post-login redirect URL', 'Full base URL used after sign-in, email confirmation, and password recovery (OAuth callback, confirm link, and reset link). Paste the URL with no trailing slash.');
 
 INSERT INTO public.app_settings (key, value)
 VALUES ('openrouter_model', '"poolside/laguna-s-2.1:free"');
