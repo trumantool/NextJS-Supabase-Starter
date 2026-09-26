@@ -8,8 +8,10 @@ This repo ships a real `supabase/migrations/` history starting at:
 
 - [`migrations/20260913223000_slim_starter_baseline.sql`](./migrations/20260913223000_slim_starter_baseline.sql)
 - [`migrations/20260913224500_byok_column_privileges.sql`](./migrations/20260913224500_byok_column_privileges.sql) — `openrouter_api_key` is service-role only
+- [`migrations/20260919123000_user_data_social_profile_urls.sql`](./migrations/20260919123000_user_data_social_profile_urls.sql) — optional social profile URLs, including `website_url`
+- [`migrations/20260926223000_user_data_registration_provenance.sql`](./migrations/20260926223000_user_data_registration_provenance.sql) — signup provenance columns `application_name` and `website`
 
-That baseline is the keep-only schema (documents, not resumes; no contact/assessment/Composio tables).
+Together these are the keep-only schema (documents, not resumes; no contact/assessment/Composio tables).
 
 On a **new empty** Supabase project:
 
@@ -23,7 +25,7 @@ npx supabase db push --linked
 
 ## Consolidated view
 
-[`schema.sql`](./schema.sql) is the same SQL as the baseline migration, kept as a single-file view for reading and optional SQL Editor apply on an empty project. Prefer migrations for forks. Do not re-run `schema.sql` on a project that already applied the migration.
+[`schema.sql`](./schema.sql) is the consolidated schema (baseline plus later migrations), kept as a single-file view for reading and optional SQL Editor apply on an empty project. Prefer migrations for forks. Do not re-run `schema.sql` on a project that already applied migrations.
 
 ## Storage buckets
 
@@ -37,6 +39,17 @@ npx supabase db push --linked
 There is **no** `resumes` or `documents` storage bucket. Document content lives in `documents.doc_json`.
 
 `handle_new_user` seeds `user_data`, `user_settings`, and folder markers in all four buckets.
+
+On each new signup it copies two admin options onto that `user_data` row:
+
+| Admin option | Column | Fallback if the option is missing or blank |
+|---|---|---|
+| `application_name` | `user_data.application_name` | `boilerplate` |
+| `website` | `user_data.website` | `nexjsboilerplate.com` |
+
+Those options are edited in Admin → Site Settings with the other `admin_settings` rows. Saving them changes future signups only. Existing `user_data` rows stay as stamped. Authenticated users can read the stamp on their own row and cannot update `application_name` or `website` (service role can).
+
+`user_data.website` is registration provenance. It is not `user_data.website_url` (the optional social profile link). This starter has no `site_url` admin option; do not use the provenance website as an OAuth or canonical site URL.
 
 ## Do not reuse Marketing Agent
 

@@ -54,7 +54,9 @@ npx supabase db push --linked
 
 That creates only the keep tables and buckets (`user-files`, `files`, `agent-skills`, `agent-memory`). Document content lives in `documents.doc_json` — there is no resumes/documents storage bucket.
 
-[`supabase/schema.sql`](./supabase/schema.sql) is the same SQL as the baseline migration, kept as a consolidated view. You can paste it into the SQL Editor on an empty project instead of using the CLI. Do not re-run it on a project that already applied migrations.
+[`supabase/schema.sql`](./supabase/schema.sql) is the consolidated schema (baseline plus later migrations), kept as a single-file view. You can paste it into the SQL Editor on an empty project instead of using the CLI. Do not re-run it on a project that already applied migrations.
+
+New signups copy `admin_settings.application_name` and `admin_settings.website` onto `user_data` (fallbacks `boilerplate` and `nexjsboilerplate.com`). Editing those admin options does not rewrite existing users. `user_data.website` is registration provenance, separate from the social profile `website_url`.
 
 Details: [`supabase/README.md`](./supabase/README.md).
 

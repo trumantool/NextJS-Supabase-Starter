@@ -96,6 +96,9 @@ GRANT EXECUTE ON FUNCTION public.set_updated_at() TO service_role;
 -- Seeds required user rows + storage folders for the keep buckets.
 -- SECURITY DEFINER: the auth trigger runs as supabase_auth_admin, which cannot
 -- INSERT into public profile tables.
+-- Registration provenance (application_name, website) is read from admin_settings
+-- at insert time. Later edits to those options do not rewrite existing rows.
+-- website is not user_data.website_url and is not an OAuth/canonical site_url.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -105,12 +108,45 @@ AS $$
 DECLARE
   v_first_name text;
   v_last_name text;
+  v_application_name text;
+  v_website text;
 BEGIN
   v_first_name := NEW.raw_user_meta_data->>'first_name';
   v_last_name := NEW.raw_user_meta_data->>'last_name';
 
-  INSERT INTO public.user_data (user_id, first_name, last_name, email, user_role)
-  VALUES (NEW.id, v_first_name, v_last_name, NEW.email, 'free');
+  -- Missing rows and blank values fall back to the starter defaults.
+  -- SELECT INTO with no match assigns NULL, so COALESCE runs after the lookup.
+  SELECT NULLIF(btrim(option_value), '')
+  INTO v_application_name
+  FROM public.admin_settings
+  WHERE option_name = 'application_name';
+
+  SELECT NULLIF(btrim(option_value), '')
+  INTO v_website
+  FROM public.admin_settings
+  WHERE option_name = 'website';
+
+  v_application_name := COALESCE(v_application_name, 'boilerplate');
+  v_website := COALESCE(v_website, 'nexjsboilerplate.com');
+
+  INSERT INTO public.user_data (
+    user_id,
+    first_name,
+    last_name,
+    email,
+    user_role,
+    application_name,
+    website
+  )
+  VALUES (
+    NEW.id,
+    v_first_name,
+    v_last_name,
+    NEW.email,
+    'free',
+    v_application_name,
+    v_website
+  );
 
   INSERT INTO public.user_settings (user_id, first_name, last_name, email)
   VALUES (NEW.id, v_first_name, v_last_name, NEW.email);
@@ -164,6 +200,8 @@ CREATE TABLE public.user_data (
   instagram_url text,
   youtube_url text,
   website_url text,
+  application_name text DEFAULT 'boilerplate',
+  website text DEFAULT 'nexjsboilerplate.com',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -180,6 +218,10 @@ COMMENT ON COLUMN public.user_data.youtube_url IS
   'Optional YouTube channel or video URL.';
 COMMENT ON COLUMN public.user_data.website_url IS
   'Optional personal or company website URL.';
+COMMENT ON COLUMN public.user_data.application_name IS
+  'Registration provenance: app name copied from admin_settings.application_name at signup. Fallback boilerplate. Admin edits do not rewrite this value.';
+COMMENT ON COLUMN public.user_data.website IS
+  'Registration provenance website copied from admin_settings.website at signup. Fallback nexjsboilerplate.com. Not website_url, and not an OAuth or canonical site URL. Admin edits do not rewrite this value.';
 
 CREATE TABLE public.user_settings (
   user_id uuid NOT NULL PRIMARY KEY
@@ -1064,7 +1106,26 @@ USING (true) WITH CHECK (true);
 -- 9. GRANTS
 -- ============================================================================
 
-GRANT SELECT, UPDATE ON public.user_data TO authenticated;
+-- Owners can read the row, including the signup stamp. They can update profile
+-- fields, but not application_name or website. Those are written by
+-- handle_new_user. Service role keeps full access. Add new owner-editable
+-- columns to this UPDATE list; table-level UPDATE would also allow rewriting
+-- the provenance stamp.
+GRANT SELECT ON public.user_data TO authenticated;
+GRANT UPDATE (
+  user_role,
+  first_name,
+  last_name,
+  email,
+  twitter_url,
+  linkedin_url,
+  github_url,
+  instagram_url,
+  youtube_url,
+  website_url,
+  created_at,
+  updated_at
+) ON public.user_data TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_data TO service_role;
 
 -- Profile fields are readable/updatable by the owner (RLS). The BYOK key
@@ -1245,7 +1306,9 @@ VALUES
   ('support_hours', '', 'text', 'Support Hours', 'Available as the [support_hours] shortcode.'),
   ('phone_number', '', 'text', 'Phone Number', 'Available as the [phone_number] shortcode.'),
   ('privacy_policy', '<h1>Privacy Policy</h1><p>This Privacy Policy explains how [site_title] ("we", "us", or "our") collects, uses, discloses, and safeguards your information when you use our services.</p>', 'textarea', 'Privacy Policy', 'The privacy policy content shown on the /privacy page. Supports shortcodes like [site_title], [company_name], and [support_email].'),
-  ('terms_of_service', '<h1>Terms of Service</h1><p>Welcome to [site_title] ("we", "us", or "our"). By accessing or using our services, you agree to be bound by these Terms of Service.</p>', 'textarea', 'Terms of Service', 'The Terms of Service content shown on the /terms page. Supports shortcodes like [site_title], [company_name], and [support_email].');
+  ('terms_of_service', '<h1>Terms of Service</h1><p>Welcome to [site_title] ("we", "us", or "our"). By accessing or using our services, you agree to be bound by these Terms of Service.</p>', 'textarea', 'Terms of Service', 'The Terms of Service content shown on the /terms page. Supports shortcodes like [site_title], [company_name], and [support_email].'),
+  ('application_name', 'boilerplate', 'text', 'Application Name', 'Stamped onto user_data.application_name for new signups. Changing this does not rewrite existing users. If this value is blank, signup falls back to boilerplate.'),
+  ('website', 'nexjsboilerplate.com', 'text', 'Registration Website', 'Stamped onto user_data.website for new signups. This is registration provenance, not the social profile website_url and not an OAuth or canonical site URL. Changing this does not rewrite existing users. If this value is blank, signup falls back to nexjsboilerplate.com.');
 
 INSERT INTO public.app_settings (key, value)
 VALUES ('openrouter_model', '"poolside/laguna-s-2.1:free"');
