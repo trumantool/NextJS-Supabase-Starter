@@ -158,9 +158,28 @@ CREATE TABLE public.user_data (
   first_name text,
   last_name text,
   email text,
+  twitter_url text,
+  linkedin_url text,
+  github_url text,
+  instagram_url text,
+  youtube_url text,
+  website_url text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+COMMENT ON COLUMN public.user_data.twitter_url IS
+  'Optional X/Twitter profile URL.';
+COMMENT ON COLUMN public.user_data.linkedin_url IS
+  'Optional LinkedIn profile URL.';
+COMMENT ON COLUMN public.user_data.github_url IS
+  'Optional GitHub profile URL.';
+COMMENT ON COLUMN public.user_data.instagram_url IS
+  'Optional Instagram profile URL.';
+COMMENT ON COLUMN public.user_data.youtube_url IS
+  'Optional YouTube channel or video URL.';
+COMMENT ON COLUMN public.user_data.website_url IS
+  'Optional personal or company website URL.';
 
 CREATE TABLE public.user_settings (
   user_id uuid NOT NULL PRIMARY KEY
