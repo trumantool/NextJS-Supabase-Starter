@@ -27,6 +27,8 @@ export default async function AdminPage() {
         </div>
         <p className="text-muted-foreground mb-8">
           Manage site-wide configuration options. Changes apply immediately.
+          Application name and registration website are copied onto new signups
+          only and do not rewrite existing users.
         </p>
         <Suspense fallback={<p className="text-sm text-gray-500">Loading admin settings…</p>}>
           <AdminSettingsTabs />
