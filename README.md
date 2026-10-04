@@ -68,10 +68,11 @@ Use this on every fork. Never attach Marketing Agent’s project.
 4. Auth → URL configuration: Site URL `http://localhost:3000`, redirect `http://localhost:3000/**`. Hosted later: your production origin and `https://YOUR_DOMAIN/**`.
 5. `cd nextjs && cp .env.template .env.local`. Fill from the **new** project. Required keys are listed under [Environment variables](#environment-variables).
 6. Generate `CRON_SECRET` with `openssl rand -hex 32`. Put it only in server/Vercel env — never `NEXT_PUBLIC_*`.
-7. Set `OPENROUTER_API_KEY` from [openrouter.ai/keys](https://openrouter.ai/keys). Do **not** set `OPENROUTER_API_KEY_REACHTHEMAI`.
-8. Set `NEXT_PUBLIC_PRODUCTNAME`.
-9. `npm install && npm run dev` from `nextjs/`. Open [http://localhost:3000](http://localhost:3000).
-10. When you deploy: create a **new** Vercel project (never `marketing-agent-truman`). Root Directory = `nextjs`. Set the same server secrets, including `CRON_SECRET`.
+7. Set `OPENROUTER_API_KEY` from [openrouter.ai/keys](https://openrouter.ai/keys). Do **not** set `OPENROUTER_API_KEY_REACHTHEMAI`. Admin can also store an empty-by-default `openrouter_api_key` in Admin Settings. Do not paste Marketing or Edu key values.
+8. Optional Stripe: set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, and `STRIPE_PRICE_ID` or `STRIPE_PRICE_PLAN_MAP`. Point the webhook at `/api/stripe/webhook`.
+9. Set `NEXT_PUBLIC_PRODUCTNAME`.
+10. `npm install && npm run dev` from `nextjs/`. Open [http://localhost:3000](http://localhost:3000).
+11. When you deploy: create a **new** Vercel project (never `marketing-agent-truman`). Root Directory = `nextjs`. Set the same server secrets, including `CRON_SECRET` and Stripe keys if you use billing.
 
 ## Security reminders
 
@@ -104,7 +105,12 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Browser + server Supabase clients |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Anon client + middleware |
 | `PRIVATE_SUPABASE_SERVICE_KEY` | Yes | `serverAdminClient` (service role, server-only) |
-| `OPENROUTER_API_KEY` | Yes for AI | Platform OpenRouter key for Documents, Chat, and Automations (users may override with BYOK) |
+| `OPENROUTER_API_KEY` | Yes for AI | Fallback OpenRouter key after BYOK and `admin_settings.openrouter_api_key` (unless the force-platform flag is on) |
+| `STRIPE_SECRET_KEY` | No | Checkout, Customer Portal, and webhook signature verification |
+| `STRIPE_WEBHOOK_SECRET` | No | `POST /api/stripe/webhook` |
+| `STRIPE_PRICE_ID` | No | Default Checkout price. Overrides `STRIPE_PRICE_PLAN_MAP` |
+| `STRIPE_PRICE_PLAN_MAP` | No | `price_xxx:plan` pairs written onto `user_data.plan` |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | No | Marks Checkout as configured. Hosted Checkout does not load Stripe.js |
 | `NEXT_PUBLIC_PRODUCTNAME` | Yes | Title, header, footer, homepage |
 | `CRON_SECRET` | Yes for cron | Bearer secret for `/api/cron/automations` and `/api/workers/automations` |
 | `NEXT_PUBLIC_THEME` | No | Body theme class (default `theme-sass3`) |
