@@ -45,4 +45,14 @@ describe('token ledger SQL', () => {
     assert.match(sql, /'openrouter_force_platform_key',\s*'false',\s*'boolean'/)
     assert.match(sql, /'openrouter_cost_markup',\s*'0',\s*'text'/)
   })
+
+  it('does not use a column REVOKE as the privilege boundary', () => {
+    for (const file of files) {
+      const sql = readFileSync(file, 'utf8')
+      assert.equal(sql.includes('REVOKE UPDATE ('), false, file)
+      assert.match(sql, /GRANT UPDATE \(\s*user_id/)
+      assert.match(sql, /GRANT UPDATE \(\s*id,\s*chat_id/)
+      assert.match(sql, /protect_message_token_columns/)
+    }
+  })
 })

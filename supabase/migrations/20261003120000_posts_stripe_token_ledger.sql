@@ -42,19 +42,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_data_stripe_subscription_id_idx
   ON public.user_data (stripe_subscription_id)
   WHERE stripe_subscription_id IS NOT NULL;
 
--- Authenticated owners keep table UPDATE for profile fields. Privileged
--- columns are reverted by the trigger and also revoked here so a later
--- column-level GRANT (registration provenance) does not have to list them.
-REVOKE UPDATE (
-  plan,
-  plan_status,
-  stripe_customer_id,
-  stripe_subscription_id,
-  current_period_end,
-  total_input_tokens,
-  total_output_tokens,
-  total_tokens
-) ON public.user_data FROM PUBLIC, anon, authenticated;
+-- A column REVOKE does not remove a table-level UPDATE grant. Drop table
+-- UPDATE, then grant only the columns authenticated may write.
+REVOKE UPDATE ON public.user_data FROM PUBLIC, anon, authenticated;
+GRANT UPDATE (
+  user_id,
+  user_role,
+  first_name,
+  last_name,
+  email,
+  twitter_url,
+  linkedin_url,
+  github_url,
+  instagram_url,
+  youtube_url,
+  website_url,
+  created_at,
+  updated_at
+) ON public.user_data TO authenticated;
 
 -- ============================================================================
 -- Turn token columns
@@ -69,7 +74,53 @@ COMMENT ON COLUMN public.messages.input_tokens IS
 COMMENT ON COLUMN public.messages.output_tokens IS
   'Completion tokens for this turn. Set by record_llm_turn_usage.';
 
-REVOKE UPDATE (input_tokens, output_tokens) ON public.messages FROM PUBLIC, anon, authenticated;
+-- Table-level INSERT/UPDATE would still allow token columns. Replace them
+-- with column lists, and freeze the token columns in a trigger.
+REVOKE INSERT, UPDATE ON public.messages FROM PUBLIC, anon, authenticated;
+GRANT INSERT (
+  id,
+  chat_id,
+  role,
+  content,
+  created_at
+) ON public.messages TO authenticated;
+GRANT UPDATE (
+  id,
+  chat_id,
+  role,
+  content,
+  created_at
+) ON public.messages TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.protect_message_token_columns()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  IF COALESCE((SELECT auth.jwt() ->> 'role'), '') = 'service_role'
+     OR current_setting('app.allow_token_update', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'UPDATE' THEN
+    NEW.input_tokens := OLD.input_tokens;
+    NEW.output_tokens := OLD.output_tokens;
+  ELSE
+    NEW.input_tokens := NULL;
+    NEW.output_tokens := NULL;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.protect_message_token_columns() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_messages_protect_token_columns ON public.messages;
+CREATE TRIGGER trg_messages_protect_token_columns
+BEFORE INSERT OR UPDATE ON public.messages
+FOR EACH ROW
+EXECUTE FUNCTION public.protect_message_token_columns();
 
 ALTER TABLE public.automation_runs
   ADD COLUMN IF NOT EXISTS input_tokens bigint,
@@ -593,3 +644,45 @@ VALUES
     'Markup stored on llm_turn_rates when a turn is recorded. 0 means no markup. Not a secret.'
   )
 ON CONFLICT (option_name) DO NOTHING;
+
+-- Profile inserts must survive a storage.objects failure. The baseline
+-- function caught every error and still returned NEW, which committed the
+-- auth user with no user_data row.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_first_name text;
+  v_last_name text;
+BEGIN
+  v_first_name := NEW.raw_user_meta_data->>'first_name';
+  v_last_name := NEW.raw_user_meta_data->>'last_name';
+
+  INSERT INTO public.user_data (user_id, first_name, last_name, email, user_role)
+  VALUES (NEW.id, v_first_name, v_last_name, NEW.email, 'free');
+
+  INSERT INTO public.user_settings (user_id, first_name, last_name, email)
+  VALUES (NEW.id, v_first_name, v_last_name, NEW.email);
+
+  -- Folder markers are best-effort. Their failure must not roll back the profile rows above.
+  BEGIN
+    INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+    VALUES
+      ('user-files', NEW.id::text || '/', NEW.id, '{"eTag": true}'),
+      ('files', NEW.id::text || '/', NEW.id, '{"eTag": true}'),
+      ('agent-skills', NEW.id::text || '/', NEW.id, '{"eTag": true}'),
+      ('agent-memory', NEW.id::text || '/', NEW.id, '{"eTag": true}');
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'handle_new_user storage markers skipped: %', SQLERRM;
+  END;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO service_role;
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin;
