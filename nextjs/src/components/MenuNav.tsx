@@ -78,6 +78,9 @@ export default function MenuNav() {
           )}
         </div>
 
+        <Link href="/posts" className="text-gray-600 hover:text-gray-900">
+          Posts
+        </Link>
         <Link href="/contact" className="text-gray-600 hover:text-gray-900">
           Contact
         </Link>

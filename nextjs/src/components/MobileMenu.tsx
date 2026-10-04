@@ -93,6 +93,13 @@ export default function MobileMenu() {
                             </div>
                         )}
                         <Link
+                            href="/posts"
+                            onClick={() => setIsOpen(false)}
+                            className="block px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                        >
+                            Posts
+                        </Link>
+                        <Link
                             href="/contact"
                             onClick={() => setIsOpen(false)}
                             className="block px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"

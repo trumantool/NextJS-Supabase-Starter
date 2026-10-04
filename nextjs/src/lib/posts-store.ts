@@ -1,0 +1,246 @@
+import { createSSRClient } from '@/lib/supabase/server'
+import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
+import type { Post } from '@/lib/types'
+import { isHttpUrl, isPostSlug, isPostType, slugifyTitle } from '@/lib/posts'
+
+export type PostInput = {
+  title?: unknown
+  slug?: unknown
+  summary?: unknown
+  body?: unknown
+  type?: unknown
+  parent_id?: unknown
+  status?: unknown
+  video_url?: unknown
+  cover_image_url?: unknown
+  sort_order?: unknown
+  origin?: unknown
+}
+
+const LIST_COLUMNS =
+  'id, type, parent_id, title, slug, summary, cover_image_url, sort_order, status, published_at, author_id, updated_at'
+
+async function requireUserId(): Promise<string> {
+  const supabase = await createSSRClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+  return user.id
+}
+
+function optionalText(value: unknown, max: number, label: string): string | null {
+  if (value == null) return null
+  if (typeof value !== 'string') throw new Error(`${label} must be text`)
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (trimmed.length > max) throw new Error(`${label} is too long`)
+  return trimmed
+}
+
+function optionalUrl(value: unknown, label: string): string | null {
+  const text = optionalText(value, 2000, label)
+  if (!text) return null
+  if (!isHttpUrl(text)) throw new Error(`${label} must be an http(s) URL`)
+  return text
+}
+
+async function uniqueSlug(base: string, ignoreId?: string): Promise<string> {
+  const admin = await createServerAdminClient()
+  let candidate = base
+  for (let n = 2; n < 50; n += 1) {
+    const { data, error } = await admin.from('posts').select('id').eq('slug', candidate).maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!data || data.id === ignoreId) return candidate
+    const suffix = `-${n}`
+    candidate = `${base.slice(0, 120 - suffix.length)}${suffix}`
+  }
+  throw new Error('Could not find a unique slug')
+}
+
+export type PostListItem = Pick<
+  Post,
+  | 'id'
+  | 'type'
+  | 'parent_id'
+  | 'title'
+  | 'slug'
+  | 'summary'
+  | 'cover_image_url'
+  | 'sort_order'
+  | 'status'
+  | 'published_at'
+  | 'author_id'
+  | 'updated_at'
+>
+
+export async function listMyPosts(): Promise<PostListItem[]> {
+  await requireUserId()
+  const supabase = await createSSRClient()
+  const { data, error } = await supabase
+    .from('posts')
+    .select(LIST_COLUMNS)
+    .order('updated_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as PostListItem[]
+}
+
+const PUBLIC_COLUMNS =
+  'id, type, title, slug, summary, body, cover_image_url, video_url, published_at, sort_order'
+
+export type PublishedPost = {
+  id: string
+  type: string
+  title: string
+  slug: string
+  summary: string | null
+  body: string
+  cover_image_url: string | null
+  video_url: string | null
+  published_at: string | null
+  sort_order: number
+}
+
+export async function listPublishedPosts(): Promise<PublishedPost[]> {
+  const supabase = await createSSRClient()
+  const { data, error } = await supabase
+    .from('posts')
+    .select(PUBLIC_COLUMNS)
+    .eq('status', 'published')
+    .order('sort_order', { ascending: true })
+    .order('published_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as PublishedPost[]
+}
+
+export async function getPublishedPostBySlug(slug: string): Promise<PublishedPost | null> {
+  const supabase = await createSSRClient()
+  const { data, error } = await supabase
+    .from('posts')
+    .select(PUBLIC_COLUMNS)
+    .eq('status', 'published')
+    .eq('slug', slug)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as PublishedPost | null) ?? null
+}
+
+export async function getMyPost(id: string): Promise<Post> {
+  await requireUserId()
+  const supabase = await createSSRClient()
+  const { data, error } = await supabase.from('posts').select('*').eq('id', id).maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('Post not found')
+  return data as Post
+}
+
+export async function createPost(input: PostInput): Promise<Post> {
+  const userId = await requireUserId()
+  const fields = await normalizePost(input, userId)
+  const supabase = await createSSRClient()
+  const { data, error } = await supabase
+    .from('posts')
+    .insert({ ...fields, author_id: userId })
+    .select('*')
+    .single()
+  if (error) throw new Error(error.message)
+  return data as Post
+}
+
+export async function updatePost(id: string, input: PostInput): Promise<Post> {
+  const userId = await requireUserId()
+  const existing = await getMyPost(id)
+  if (existing.author_id !== userId) throw new Error('Post not found')
+  const fields = await normalizePost(input, userId, existing)
+  const supabase = await createSSRClient()
+  const { data, error } = await supabase
+    .from('posts')
+    .update(fields)
+    .eq('id', id)
+    .eq('author_id', userId)
+    .select('*')
+    .single()
+  if (error) throw new Error(error.message)
+  return data as Post
+}
+
+export async function deletePost(id: string): Promise<void> {
+  const userId = await requireUserId()
+  const supabase = await createSSRClient()
+  const { error } = await supabase.from('posts').delete().eq('id', id).eq('author_id', userId)
+  if (error) throw new Error(error.message)
+}
+
+async function normalizePost(input: PostInput, userId: string, existing?: Post) {
+  const title = typeof input.title === 'string' ? input.title.trim() : existing?.title ?? ''
+  if (!title || title.length > 200) throw new Error('Title must be 1–200 characters')
+
+  const requestedSlug =
+    typeof input.slug === 'string' && input.slug.trim()
+      ? input.slug.trim().toLowerCase()
+      : existing?.slug ?? slugifyTitle(title)
+  if (!isPostSlug(requestedSlug)) {
+    throw new Error('Slug must be lowercase letters, numbers, and hyphens')
+  }
+  const slug = await uniqueSlug(requestedSlug, existing?.id)
+
+  const typeRaw =
+    typeof input.type === 'string' && input.type.trim()
+      ? input.type.trim().toLowerCase()
+      : existing?.type ?? 'post'
+  if (!isPostType(typeRaw)) throw new Error('Type must be a short slug such as post or page')
+
+  const summary = optionalText(input.summary ?? existing?.summary ?? null, 500, 'Summary')
+  const bodySource = input.body ?? existing?.body ?? ''
+  if (typeof bodySource !== 'string') throw new Error('Body must be text')
+  if (bodySource.length > 200000) throw new Error('Body is too long')
+
+  const parentRaw = input.parent_id === undefined ? existing?.parent_id ?? null : input.parent_id
+  let parent_id: string | null = null
+  if (typeof parentRaw === 'string' && parentRaw.trim()) {
+    parent_id = parentRaw.trim()
+    if (existing && parent_id === existing.id) throw new Error('A post cannot be its own parent')
+    const supabase = await createSSRClient()
+    const { data: parent, error } = await supabase
+      .from('posts')
+      .select('id, author_id')
+      .eq('id', parent_id)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!parent || parent.author_id !== userId) throw new Error('Parent post was not found')
+  }
+
+  const statusRaw = typeof input.status === 'string' ? input.status : existing?.status ?? 'draft'
+  if (statusRaw !== 'draft' && statusRaw !== 'published') {
+    throw new Error('Status must be draft or published')
+  }
+
+  let published_at = existing?.published_at ?? null
+  if (statusRaw === 'published' && !published_at) {
+    published_at = new Date().toISOString()
+  }
+
+  const sortSource = input.sort_order ?? existing?.sort_order ?? 0
+  const sort_order = typeof sortSource === 'number' ? sortSource : Number(sortSource)
+  if (!Number.isInteger(sort_order)) throw new Error('Sort order must be an integer')
+
+  const origin = optionalText(input.origin ?? existing?.origin ?? null, 80, 'Origin')
+
+  return {
+    title,
+    slug,
+    type: typeRaw,
+    summary,
+    body: bodySource,
+    parent_id,
+    status: statusRaw,
+    published_at,
+    video_url: optionalUrl(input.video_url ?? existing?.video_url ?? null, 'Video URL'),
+    cover_image_url: optionalUrl(
+      input.cover_image_url ?? existing?.cover_image_url ?? null,
+      'Cover image URL'
+    ),
+    sort_order,
+    origin,
+  }
+}

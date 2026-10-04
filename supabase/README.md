@@ -8,6 +8,10 @@ This repo ships a real `supabase/migrations/` history starting at:
 
 - [`migrations/20260913223000_slim_starter_baseline.sql`](./migrations/20260913223000_slim_starter_baseline.sql)
 - [`migrations/20260913224500_byok_column_privileges.sql`](./migrations/20260913224500_byok_column_privileges.sql) — `openrouter_api_key` is service-role only
+- [`migrations/20260919123000_user_data_social_profile_urls.sql`](./migrations/20260919123000_user_data_social_profile_urls.sql) — optional social URL columns
+- [`migrations/20261003120000_posts_stripe_token_ledger.sql`](./migrations/20261003120000_posts_stripe_token_ledger.sql) — `posts`, Stripe columns on `user_data`, token ledger, empty OpenRouter admin settings
+
+Apply these only on a new empty project you control. Do not apply them to Marketing Agent (`glplvrljdgowcwuubkau`) or any other live database from this change.
 
 That baseline is the keep-only schema (documents, not resumes; no contact/assessment/Composio tables).
 

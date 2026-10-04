@@ -1,9 +1,23 @@
 'use server'
 
 import { createSSRClient } from '@/lib/supabase/server'
+import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
 import { Tables } from '@/lib/types'
 
 type AdminSetting = Tables<'admin_settings'>
+
+export type AdminSettingView = AdminSetting & { secret_is_set: boolean }
+
+function presentAdminSetting(row: AdminSetting): AdminSettingView {
+  if (row.option_field_type === 'secret') {
+    return {
+      ...row,
+      option_value: '',
+      secret_is_set: row.option_value.trim().length > 0,
+    }
+  }
+  return { ...row, secret_is_set: false }
+}
 
 /**
  * Checks whether the current authenticated user has the 'admin' role.
@@ -28,7 +42,7 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
 /**
  * Fetches all admin settings. Only accessible to admin users.
  */
-export async function getAdminSettings(): Promise<AdminSetting[]> {
+export async function getAdminSettings(): Promise<AdminSettingView[]> {
   const supabase = await createSSRClient()
   const {
     data: { user },
@@ -44,13 +58,15 @@ export async function getAdminSettings(): Promise<AdminSetting[]> {
     throw new Error('Forbidden: admin access required')
   }
 
-  const { data, error } = await supabase
+  // Service role sees secret rows. They are masked before leaving the server.
+  const admin = await createServerAdminClient()
+  const { data, error } = await admin
     .from('admin_settings')
     .select('*')
     .order('created_at', { ascending: true })
 
   if (error) throw new Error(error.message)
-  return (data ?? []) as AdminSetting[]
+  return ((data ?? []) as AdminSetting[]).map(presentAdminSetting)
 }
 
 /**
@@ -86,8 +102,9 @@ export async function getAdminSettingsByNames(
  */
 export async function updateAdminSetting(
   id: string,
-  optionValue: string
-): Promise<AdminSetting> {
+  optionValue: string,
+  options?: { clearSecret?: boolean }
+): Promise<AdminSettingView> {
   const supabase = await createSSRClient()
   const {
     data: { user },
@@ -103,13 +120,35 @@ export async function updateAdminSetting(
     throw new Error('Forbidden: admin access required')
   }
 
-  const { data, error } = await supabase
+  const admin = await createServerAdminClient()
+  const { data: existing, error: readError } = await admin
     .from('admin_settings')
-    .update({ option_value: optionValue, updated_at: new Date().toISOString() })
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+  if (readError) throw new Error(readError.message)
+  if (!existing) throw new Error('Setting not found')
+
+  const row = existing as AdminSetting
+  let nextValue = optionValue
+  if (row.option_field_type === 'secret') {
+    if (options?.clearSecret) {
+      nextValue = ''
+    } else if (!optionValue.trim()) {
+      return presentAdminSetting(row)
+    } else {
+      nextValue = optionValue.trim()
+    }
+  }
+
+  const writer = row.option_field_type === 'secret' ? admin : supabase
+  const { data, error } = await writer
+    .from('admin_settings')
+    .update({ option_value: nextValue, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single()
 
   if (error) throw new Error(error.message)
-  return data as AdminSetting
+  return presentAdminSetting(data as AdminSetting)
 }
