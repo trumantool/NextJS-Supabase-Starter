@@ -1,7 +1,14 @@
 import { createSSRClient } from '@/lib/supabase/server'
 import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
 import type { Post } from '@/lib/types'
-import { isHttpUrl, isPostSlug, isPostType, slugifyTitle } from '@/lib/posts'
+import {
+  isHttpUrl,
+  isPostSlug,
+  isPostType,
+  requirePostWebsite,
+  slugifyTitle,
+  type PostWebsite,
+} from '@/lib/posts'
 
 export type PostInput = {
   title?: unknown
@@ -18,7 +25,11 @@ export type PostInput = {
 }
 
 const LIST_COLUMNS =
-  'id, type, parent_id, title, slug, summary, cover_image_url, sort_order, status, published_at, author_id, updated_at'
+  'id, website, type, parent_id, title, slug, summary, cover_image_url, sort_order, status, published_at, author_id, updated_at'
+
+function currentWebsite(): PostWebsite {
+  return requirePostWebsite(process.env.POSTS_WEBSITE)
+}
 
 async function requireUserId(): Promise<string> {
   const supabase = await createSSRClient()
@@ -45,11 +56,16 @@ function optionalUrl(value: unknown, label: string): string | null {
   return text
 }
 
-async function uniqueSlug(base: string, ignoreId?: string): Promise<string> {
+async function uniqueSlug(base: string, website: PostWebsite, ignoreId?: string): Promise<string> {
   const admin = await createServerAdminClient()
   let candidate = base
   for (let n = 2; n < 50; n += 1) {
-    const { data, error } = await admin.from('posts').select('id').eq('slug', candidate).maybeSingle()
+    const { data, error } = await admin
+      .from('posts')
+      .select('id')
+      .eq('website', website)
+      .eq('slug', candidate)
+      .maybeSingle()
     if (error) throw new Error(error.message)
     if (!data || data.id === ignoreId) return candidate
     const suffix = `-${n}`
@@ -61,6 +77,7 @@ async function uniqueSlug(base: string, ignoreId?: string): Promise<string> {
 export type PostListItem = Pick<
   Post,
   | 'id'
+  | 'website'
   | 'type'
   | 'parent_id'
   | 'title'
@@ -75,21 +92,24 @@ export type PostListItem = Pick<
 >
 
 export async function listMyPosts(): Promise<PostListItem[]> {
+  const website = currentWebsite()
   await requireUserId()
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('posts')
     .select(LIST_COLUMNS)
+    .eq('website', website)
     .order('updated_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []) as PostListItem[]
 }
 
 const PUBLIC_COLUMNS =
-  'id, type, title, slug, summary, body, cover_image_url, video_url, published_at, sort_order'
+  'id, website, type, title, slug, summary, body, cover_image_url, video_url, published_at, sort_order'
 
 export type PublishedPost = {
   id: string
+  website: string
   type: string
   title: string
   slug: string
@@ -102,10 +122,12 @@ export type PublishedPost = {
 }
 
 export async function listPublishedPosts(): Promise<PublishedPost[]> {
+  const website = currentWebsite()
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('posts')
     .select(PUBLIC_COLUMNS)
+    .eq('website', website)
     .eq('status', 'published')
     .order('sort_order', { ascending: true })
     .order('published_at', { ascending: false })
@@ -114,10 +136,12 @@ export async function listPublishedPosts(): Promise<PublishedPost[]> {
 }
 
 export async function getPublishedPostBySlug(slug: string): Promise<PublishedPost | null> {
+  const website = currentWebsite()
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('posts')
     .select(PUBLIC_COLUMNS)
+    .eq('website', website)
     .eq('status', 'published')
     .eq('slug', slug)
     .maybeSingle()
@@ -126,21 +150,28 @@ export async function getPublishedPostBySlug(slug: string): Promise<PublishedPos
 }
 
 export async function getMyPost(id: string): Promise<Post> {
+  const website = currentWebsite()
   await requireUserId()
   const supabase = await createSSRClient()
-  const { data, error } = await supabase.from('posts').select('*').eq('id', id).maybeSingle()
+  const { data, error } = await supabase
+    .from('posts')
+    .select('*')
+    .eq('website', website)
+    .eq('id', id)
+    .maybeSingle()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('Post not found')
   return data as Post
 }
 
 export async function createPost(input: PostInput): Promise<Post> {
+  const website = currentWebsite()
   const userId = await requireUserId()
-  const fields = await normalizePost(input, userId)
+  const fields = await normalizePost(input, userId, website)
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('posts')
-    .insert({ ...fields, author_id: userId })
+    .insert({ ...fields, author_id: userId, website })
     .select('*')
     .single()
   if (error) throw new Error(error.message)
@@ -148,16 +179,18 @@ export async function createPost(input: PostInput): Promise<Post> {
 }
 
 export async function updatePost(id: string, input: PostInput): Promise<Post> {
+  const website = currentWebsite()
   const userId = await requireUserId()
   const existing = await getMyPost(id)
-  if (existing.author_id !== userId) throw new Error('Post not found')
-  const fields = await normalizePost(input, userId, existing)
+  if (existing.author_id !== userId || existing.website !== website) throw new Error('Post not found')
+  const fields = await normalizePost(input, userId, website, existing)
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('posts')
-    .update(fields)
+    .update({ ...fields, website })
     .eq('id', id)
     .eq('author_id', userId)
+    .eq('website', website)
     .select('*')
     .single()
   if (error) throw new Error(error.message)
@@ -165,13 +198,24 @@ export async function updatePost(id: string, input: PostInput): Promise<Post> {
 }
 
 export async function deletePost(id: string): Promise<void> {
+  const website = currentWebsite()
   const userId = await requireUserId()
   const supabase = await createSSRClient()
-  const { error } = await supabase.from('posts').delete().eq('id', id).eq('author_id', userId)
+  const { error } = await supabase
+    .from('posts')
+    .delete()
+    .eq('id', id)
+    .eq('author_id', userId)
+    .eq('website', website)
   if (error) throw new Error(error.message)
 }
 
-async function normalizePost(input: PostInput, userId: string, existing?: Post) {
+async function normalizePost(
+  input: PostInput,
+  userId: string,
+  website: PostWebsite,
+  existing?: Post
+) {
   const title = typeof input.title === 'string' ? input.title.trim() : existing?.title ?? ''
   if (!title || title.length > 200) throw new Error('Title must be 1–200 characters')
 
@@ -182,7 +226,7 @@ async function normalizePost(input: PostInput, userId: string, existing?: Post) 
   if (!isPostSlug(requestedSlug)) {
     throw new Error('Slug must be lowercase letters, numbers, and hyphens')
   }
-  const slug = await uniqueSlug(requestedSlug, existing?.id)
+  const slug = await uniqueSlug(requestedSlug, website, existing?.id)
 
   const typeRaw =
     typeof input.type === 'string' && input.type.trim()
@@ -204,6 +248,7 @@ async function normalizePost(input: PostInput, userId: string, existing?: Post) 
     const { data: parent, error } = await supabase
       .from('posts')
       .select('id, author_id')
+      .eq('website', website)
       .eq('id', parent_id)
       .maybeSingle()
     if (error) throw new Error(error.message)
@@ -227,6 +272,7 @@ async function normalizePost(input: PostInput, userId: string, existing?: Post) 
   const origin = optionalText(input.origin ?? existing?.origin ?? null, 80, 'Origin')
 
   return {
+    website,
     title,
     slug,
     type: typeRaw,

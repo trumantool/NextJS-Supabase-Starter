@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import { getPublishedPostBySlug } from '@/lib/posts-store'
 
+export const dynamic = 'force-dynamic'
+
 type PageProps = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: PageProps) {

@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { listPublishedPosts } from '@/lib/posts-store'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Posts',
   description: 'Published posts.',
