@@ -506,6 +506,7 @@ COMMENT ON TABLE public.llm_turn_rates IS
 
 CREATE TABLE IF NOT EXISTS public.posts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  website text NOT NULL,
   type text NOT NULL DEFAULT 'post'
     CHECK (char_length(type) BETWEEN 1 AND 40)
     CHECK (type ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
@@ -533,11 +534,17 @@ CREATE TABLE IF NOT EXISTS public.posts (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT posts_slug_unique UNIQUE (slug),
-  CONSTRAINT posts_parent_not_self CHECK (parent_id IS NULL OR parent_id <> id)
+  CONSTRAINT posts_parent_not_self CHECK (parent_id IS NULL OR parent_id <> id),
+  CONSTRAINT posts_website_check CHECK (
+    website IN ('edu', 'marketing-agent', 'afterallcare')
+  )
 );
 
 COMMENT ON TABLE public.posts IS
   'Writing model for public pages and posts. Drafts are author-only; published rows are world-readable.';
+
+COMMENT ON COLUMN public.posts.website IS
+  'Site that owns the post. Allowed values: edu, marketing-agent, afterallcare. No column default; the deploying app sets POSTS_WEBSITE.';
 
 -- ============================================================================
 -- 5. AUTOMATION WORKER HELPERS (Phase 6; service_role only)
@@ -987,6 +994,8 @@ CREATE INDEX IF NOT EXISTS posts_parent_id_idx ON public.posts (parent_id);
 CREATE INDEX IF NOT EXISTS posts_status_published_idx
   ON public.posts (sort_order, published_at DESC)
   WHERE status = 'published';
+CREATE INDEX IF NOT EXISTS posts_website_type_status_idx
+  ON public.posts (website, type, status);
 
 -- ============================================================================
 -- 7. TRIGGERS

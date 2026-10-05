@@ -756,6 +756,7 @@ export type Database = {
       posts: {
         Row: {
           id: string
+          website: string
           type: string
           parent_id: string | null
           title: string
@@ -774,6 +775,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          website: string
           type?: string
           parent_id?: string | null
           title: string
@@ -792,6 +794,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          website?: string
           type?: string
           parent_id?: string | null
           title?: string

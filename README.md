@@ -71,8 +71,9 @@ Use this on every fork. Never attach Marketing Agent’s project.
 7. Set `OPENROUTER_API_KEY` from [openrouter.ai/keys](https://openrouter.ai/keys). Do **not** set `OPENROUTER_API_KEY_REACHTHEMAI`. Admin can also store an empty-by-default `openrouter_api_key` in Admin Settings. Do not paste Marketing or Edu key values.
 8. Optional Stripe: set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, and `STRIPE_PRICE_ID` or `STRIPE_PRICE_PLAN_MAP`. Point the webhook at `/api/stripe/webhook`.
 9. Set `NEXT_PUBLIC_PRODUCTNAME`.
-10. `npm install && npm run dev` from `nextjs/`. Open [http://localhost:3000](http://localhost:3000).
-11. When you deploy: create a **new** Vercel project (never `marketing-agent-truman`). Root Directory = `nextjs`. Set the same server secrets, including `CRON_SECRET` and Stripe keys if you use billing.
+10. Set `POSTS_WEBSITE` to the site this deployment owns: `edu`, `marketing-agent`, or `afterallcare`. Required for posts. There is no default, and the starter does not assume a site.
+11. `npm install && npm run dev` from `nextjs/`. Open [http://localhost:3000](http://localhost:3000).
+12. When you deploy: create a **new** Vercel project (never `marketing-agent-truman`). Root Directory = `nextjs`. Set the same server secrets, including `POSTS_WEBSITE`, `CRON_SECRET`, and Stripe keys if you use billing.
 
 ## Security reminders
 
@@ -112,6 +113,7 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 | `STRIPE_PRICE_PLAN_MAP` | No | `price_xxx:plan` pairs written onto `user_data.plan` |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | No | Marks Checkout as configured. Hosted Checkout does not load Stripe.js |
 | `NEXT_PUBLIC_PRODUCTNAME` | Yes | Title, header, footer, homepage |
+| `POSTS_WEBSITE` | Yes for posts | Site written to and filtered on `public.posts.website`. Allowed: `edu`, `marketing-agent`, `afterallcare`. No default |
 | `CRON_SECRET` | Yes for cron | Bearer secret for `/api/cron/automations` and `/api/workers/automations` |
 | `NEXT_PUBLIC_THEME` | No | Body theme class (default `theme-sass3`) |
 | `NEXT_PUBLIC_GOOGLE_TAG` | No | Google Analytics |
