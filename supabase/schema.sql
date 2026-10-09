@@ -514,6 +514,7 @@ CREATE TABLE IF NOT EXISTS public.posts (
   slug text NOT NULL,
   summary text,
   body text,
+  body_doc jsonb,
   video_url text,
   cover_image_url text,
   sort_order integer,

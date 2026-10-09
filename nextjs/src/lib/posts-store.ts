@@ -15,6 +15,7 @@ import {
   slugifyTitle,
   type PostWebsite,
 } from '@/lib/posts'
+import { docToMarkdown, isTipTapDoc } from '@/lib/blog-doc'
 
 export type PostInput = {
   title?: unknown
@@ -29,6 +30,7 @@ export type PostInput = {
   categories?: unknown
   tags?: unknown
   published_at?: unknown
+  body_doc?: unknown
 }
 
 const LIST_COLUMNS =
@@ -248,7 +250,7 @@ export async function updatePost(id: string, input: PostInput): Promise<Post> {
     slug: saved.slug,
     summary: saved.summary,
     body: saved.body,
-    body_doc: null,
+    body_doc: saved.body_doc,
   })
   if (revisionError) throw new Error(revisionError.message)
   refreshPublicBlog(
@@ -310,9 +312,27 @@ async function normalizePost(input: PostInput, _website: PostWebsite, existing?:
   }
 
   const summary = optionalText(input.summary ?? existing?.summary ?? null, 500, 'Summary')
-  const bodySource = input.body ?? existing?.body ?? ''
-  if (bodySource != null && typeof bodySource !== 'string') throw new Error('Body must be text')
-  if (typeof bodySource === 'string' && bodySource.length > 200000) throw new Error('Body is too long')
+  let bodyText = ''
+  if (input.body_doc !== undefined) {
+    if (input.body_doc === null) {
+      bodyText = typeof input.body === 'string' ? input.body : existing?.body ?? ''
+    } else if (!isTipTapDoc(input.body_doc)) {
+      throw new Error('Body must be a document')
+    } else {
+      bodyText = docToMarkdown(input.body_doc)
+    }
+  } else {
+    const bodySource = input.body ?? existing?.body ?? ''
+    if (bodySource != null && typeof bodySource !== 'string') throw new Error('Body must be text')
+    bodyText = typeof bodySource === 'string' ? bodySource : ''
+  }
+  if (bodyText.length > 200000) throw new Error('Body is too long')
+  const bodyDoc =
+    input.body_doc === undefined
+      ? existing?.body_doc ?? null
+      : input.body_doc === null
+        ? null
+        : (input.body_doc as Post['body_doc'])
 
   const statusRaw = typeof input.status === 'string' ? input.status : existing?.status ?? 'draft'
   if (statusRaw !== 'draft' && statusRaw !== 'published') {
@@ -334,7 +354,8 @@ async function normalizePost(input: PostInput, _website: PostWebsite, existing?:
     slug: requestedSlug,
     type: BLOG_TYPE,
     summary,
-    body: bodySource ?? '',
+    body: bodyText,
+    body_doc: bodyDoc,
     parent_id: null,
     status: publication.status,
     published_at: publication.published_at,

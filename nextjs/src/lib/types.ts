@@ -763,6 +763,7 @@ export type Database = {
           slug: string
           summary: string | null
           body: string | null
+          body_doc: Json | null
           video_url: string | null
           cover_image_url: string | null
           sort_order: number | null
@@ -782,6 +783,7 @@ export type Database = {
           slug: string
           summary?: string | null
           body?: string | null
+          body_doc?: Json | null
           video_url?: string | null
           cover_image_url?: string | null
           sort_order?: number | null
@@ -801,6 +803,7 @@ export type Database = {
           slug?: string
           summary?: string | null
           body?: string | null
+          body_doc?: Json | null
           video_url?: string | null
           cover_image_url?: string | null
           sort_order?: number | null

@@ -24,6 +24,7 @@ import {
   BLOG_MEDIA_MAX_BYTES,
 } from './posts.ts'
 import { articleJsonLd, publicSiteOrigin } from './blog-seo.ts'
+import { docFromBody, docToMarkdown } from './blog-doc.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const sqlFiles = [
@@ -194,6 +195,39 @@ describe('blog media', () => {
     assert.equal(assertBlogMedia('image/png', 100), 'png')
     assert.equal(httpStatusForPostError('Cover image must be jpeg, png, webp, or gif'), 400)
     assert.equal(blogMediaObjectPath('edu', 'user-1', 'abc', 'png').startsWith('edu/user-1/'), true)
+  })
+})
+
+describe('blog document markdown', () => {
+  it('walks headings, paragraphs, and images into markdown', () => {
+    assert.equal(
+      docToMarkdown({
+        type: 'doc',
+        content: [
+          { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Hi' }] },
+          { type: 'paragraph', content: [{ type: 'text', text: 'Body' }] },
+          { type: 'image', attrs: { src: 'https://example.com/a.png', alt: 'Cover' } },
+        ],
+      }),
+      '## Hi\n\nBody\n\n![Cover](https://example.com/a.png)'
+    )
+    const fallback = docFromBody('Plain words')
+    assert.equal(fallback.content[0]?.content?.[0]?.text, 'Plain words')
+    const panel = readFileSync(
+      join(root, 'nextjs/src/app/(dashboard)/documents/components/AiPanel.tsx'),
+      'utf8'
+    )
+    assert.match(panel, /const PRESETS/)
+    assert.match(panel, /presets = PRESETS/)
+    const ai = readFileSync(join(root, 'nextjs/src/app/(dashboard)/documents/api/ai/route.ts'), 'utf8')
+    assert.match(ai, /purpose === 'blog'/)
+    assert.match(ai, /document content/)
+    const documents = readFileSync(
+      join(root, 'nextjs/src/app/(dashboard)/documents/components/DocumentEditorClient.tsx'),
+      'utf8'
+    )
+    assert.match(documents, /onExport=\{handleExport\}/)
+    assert.equal(documents.includes('presets='), false)
   })
 })
 

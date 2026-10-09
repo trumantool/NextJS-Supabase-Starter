@@ -6,7 +6,13 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { DocumentEditor } from '@/app/(dashboard)/documents/components/DocumentEditor'
+import { AiPanel } from '@/app/(dashboard)/documents/components/AiPanel'
+import type { TipTapDoc } from '@/app/(dashboard)/documents/lib/types'
+import { docFromBody, isTipTapDoc } from '@/lib/blog-doc'
 import type { Post } from '@/lib/types'
+
+const BLOG_PRESETS = ['Draft an introduction', 'Shorten this', 'Add a heading']
 
 type EditorProps = { mode: 'new' | 'edit'; postId?: string }
 
@@ -26,7 +32,8 @@ export function PostEditor({ mode, postId }: EditorProps) {
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
   const [summary, setSummary] = useState('')
-  const [body, setBody] = useState('')
+  const [doc, setDoc] = useState<TipTapDoc>(() => docFromBody(''))
+  const [aiOpen, setAiOpen] = useState(false)
   const [status, setStatus] = useState<'draft' | 'published'>('draft')
   const [videoUrl, setVideoUrl] = useState('')
   const [coverImageUrl, setCoverImageUrl] = useState('')
@@ -53,7 +60,7 @@ export function PostEditor({ mode, postId }: EditorProps) {
         setTitle(post.title)
         setSlug(post.slug)
         setSummary(post.summary ?? '')
-        setBody(post.body ?? '')
+        setDoc(isTipTapDoc(post.body_doc) ? post.body_doc : docFromBody(post.body))
         setStatus(post.status === 'published' ? 'published' : 'draft')
         setVideoUrl(post.video_url ?? '')
         setCoverImageUrl(post.cover_image_url ?? '')
@@ -91,7 +98,7 @@ export function PostEditor({ mode, postId }: EditorProps) {
       title,
       slug,
       summary,
-      body,
+      body_doc: doc,
       type: 'blog',
       status: nextStatus,
       published_at,
@@ -121,6 +128,44 @@ export function PostEditor({ mode, postId }: EditorProps) {
     } finally {
       setSaving(false)
     }
+  }
+
+  function applyAi(text: string) {
+    const lines = text.split('\n').filter((line) => line.trim())
+    const content = lines.map((line) => ({
+      type: 'paragraph',
+      content: [{ type: 'text', text: line }],
+    }))
+    setDoc((prev) => ({ type: 'doc', content: [...prev.content, ...content] }))
+  }
+
+  function requestImageUrl(): Promise<string | null> {
+    return new Promise((resolve) => {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/jpeg,image/png,image/webp,image/gif'
+      input.onchange = () => {
+        const file = input.files?.[0]
+        if (!file) {
+          resolve(null)
+          return
+        }
+        const form = new FormData()
+        form.set('file', file)
+        void fetch('/api/posts/media', { method: 'POST', body: form })
+          .then(async (res) => {
+            const data = (await res.json()) as { url?: string; error?: string }
+            if (!res.ok || !data.url) {
+              setError(data.error || 'Failed to upload image')
+              resolve(null)
+              return
+            }
+            resolve(data.url)
+          })
+          .catch(() => resolve(null))
+      }
+      input.click()
+    })
   }
 
   async function uploadCover(file: File) {
@@ -228,11 +273,25 @@ export function PostEditor({ mode, postId }: EditorProps) {
               />
             </div>
           </div>
-          <div>
-            <label htmlFor="post-body" className="block text-sm font-medium text-gray-700">
-              Body
-            </label>
-            <Textarea id="post-body" value={body} onChange={(e) => setBody(e.target.value)} rows={14} className="mt-1 font-mono" />
+          <div className="h-[640px] overflow-hidden rounded-md border bg-white">
+            <div className="flex h-full">
+              <div className="min-w-0 flex-1">
+                <DocumentEditor
+                  initialDoc={doc}
+                  onDocChange={setDoc}
+                  onOpenAi={() => setAiOpen(true)}
+                  onRequestImageUrl={requestImageUrl}
+                />
+              </div>
+              <AiPanel
+                open={aiOpen}
+                onClose={() => setAiOpen(false)}
+                doc={doc}
+                onApply={applyAi}
+                presets={BLOG_PRESETS}
+                purpose="blog"
+              />
+            </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
