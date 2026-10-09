@@ -1,39 +1,99 @@
-import Link from 'next/link'
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
-import { getPublishedPostBySlug } from '@/lib/posts-store'
+import Link from 'next/link'
+import { CommentForm } from '@/components/posts/CommentForm'
+import { listVisibleComments } from '@/lib/blog-comments'
+import { loadPublishedArticle } from '@/lib/blog-taxonomy'
+import { articleJsonLd, postCanonical, publicSiteOrigin } from '@/lib/blog-seo'
+import { createSSRClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
 type PageProps = { params: Promise<{ slug: string }> }
 
-export async function generateMetadata({ params }: PageProps) {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const post = await getPublishedPostBySlug(slug)
-  if (!post) return { title: 'Post' }
-  return { title: post.title, description: post.summary ?? undefined }
+  const article = await loadPublishedArticle(slug)
+  if (!article) return { title: 'Post' }
+  const { post } = article
+  const origin = publicSiteOrigin(process.env.NEXT_PUBLIC_SITE_ORIGIN)
+  const canonical = postCanonical(origin, post.slug)
+  const images = post.cover_image_url ? [post.cover_image_url] : undefined
+  return {
+    title: post.title,
+    description: post.summary ?? undefined,
+    alternates: canonical ? { canonical } : undefined,
+    openGraph: {
+      type: 'article',
+      title: post.title,
+      description: post.summary ?? undefined,
+      ...(canonical ? { url: canonical } : {}),
+      publishedTime: post.published_at ?? undefined,
+      images,
+    },
+    twitter: {
+      card: images ? 'summary_large_image' : 'summary',
+      title: post.title,
+      description: post.summary ?? undefined,
+      images,
+    },
+  }
 }
 
 export default async function PostPage({ params }: PageProps) {
   const { slug } = await params
-  const post = await getPublishedPostBySlug(slug)
-  if (!post) notFound()
+  const article = await loadPublishedArticle(slug)
+  if (!article) notFound()
+  const { post, categories, tags, author, related } = article
+  const origin = publicSiteOrigin(process.env.NEXT_PUBLIC_SITE_ORIGIN)
+  const jsonLd = articleJsonLd({ post, authorName: author?.display_name ?? null, origin })
+  const supabase = await createSSRClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const comments = await listVisibleComments(post.id)
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <article className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <Link href="/posts" className="text-sm text-gray-600 hover:underline">
           All posts
         </Link>
-        <p className="mt-6 text-xs uppercase tracking-wide text-gray-500">{post.type}</p>
-        <h1 className="mt-2 text-4xl font-bold text-gray-900">{post.title}</h1>
+        <h1 className="mt-6 text-4xl font-bold text-gray-900">{post.title}</h1>
+        {author ? (
+          <p className="mt-3 text-sm text-gray-600">
+            <Link href={`/posts/author/${author.slug}`} className="hover:underline">
+              {author.display_name}
+            </Link>
+          </p>
+        ) : null}
         {post.summary ? <p className="mt-4 text-xl text-gray-600">{post.summary}</p> : null}
+        {categories.length > 0 || tags.length > 0 ? (
+          <div className="mt-4 flex flex-wrap gap-2 text-sm">
+            {categories.map((category) => (
+              <Link
+                key={category.slug}
+                href={`/posts/category/${category.slug}`}
+                className="rounded-full bg-white px-3 py-1 text-gray-700 ring-1 ring-gray-200 hover:text-primary-700"
+              >
+                {category.name}
+              </Link>
+            ))}
+            {tags.map((tag) => (
+              <Link key={tag.slug} href={`/posts/tag/${tag.slug}`} className="text-gray-600 hover:underline">
+                {tag.name}
+              </Link>
+            ))}
+          </div>
+        ) : null}
         {post.cover_image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={post.cover_image_url} alt="" className="mt-8 w-full rounded-lg" />
         ) : null}
         <div className="prose prose-gray mt-8 max-w-none">
-          <ReactMarkdown>{post.body}</ReactMarkdown>
+          <ReactMarkdown>{post.body ?? ''}</ReactMarkdown>
         </div>
         {post.video_url ? (
           <p className="mt-8">
@@ -42,6 +102,45 @@ export default async function PostPage({ params }: PageProps) {
             </a>
           </p>
         ) : null}
+        {related.length > 0 ? (
+          <aside className="mt-12">
+            <h2 className="text-lg font-semibold text-gray-900">Related</h2>
+            <ul className="mt-3 space-y-2">
+              {related.map((item) => (
+                <li key={item.id}>
+                  <Link href={`/posts/${item.slug}`} className="text-primary-700 hover:underline">
+                    {item.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        ) : null}
+        <section className="mt-12">
+          <h2 className="text-lg font-semibold text-gray-900">Comments</h2>
+          {comments.length === 0 ? (
+            <p className="mt-3 text-sm text-gray-600">No comments yet.</p>
+          ) : (
+            <ul className="mt-3 space-y-4">
+              {comments.map((comment) => (
+                <li key={comment.id} className="rounded-lg bg-white px-4 py-3 ring-1 ring-gray-200">
+                  <p className="whitespace-pre-wrap text-gray-900">{comment.body}</p>
+                  <p className="mt-2 text-xs text-gray-500">{comment.created_at.slice(0, 10)}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {user ? (
+            <CommentForm slug={post.slug} />
+          ) : (
+            <p className="mt-4 text-sm text-gray-600">
+              <Link href="/auth/login" className="hover:underline">
+                Sign in
+              </Link>{' '}
+              to comment.
+            </p>
+          )}
+        </section>
       </article>
     </div>
   )

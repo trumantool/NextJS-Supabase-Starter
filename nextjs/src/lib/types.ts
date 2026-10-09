@@ -762,13 +762,14 @@ export type Database = {
           title: string
           slug: string
           summary: string | null
-          body: string
+          body: string | null
+          body_doc: Json | null
           video_url: string | null
           cover_image_url: string | null
-          sort_order: number
+          sort_order: number | null
           status: string
           published_at: string | null
-          author_id: string
+          author_id: string | null
           origin: string | null
           created_at: string
           updated_at: string
@@ -776,18 +777,19 @@ export type Database = {
         Insert: {
           id?: string
           website: string
-          type?: string
+          type: string
           parent_id?: string | null
           title: string
           slug: string
           summary?: string | null
-          body?: string
+          body?: string | null
+          body_doc?: Json | null
           video_url?: string | null
           cover_image_url?: string | null
-          sort_order?: number
+          sort_order?: number | null
           status?: string
           published_at?: string | null
-          author_id: string
+          author_id?: string | null
           origin?: string | null
           created_at?: string
           updated_at?: string
@@ -800,16 +802,239 @@ export type Database = {
           title?: string
           slug?: string
           summary?: string | null
-          body?: string
+          body?: string | null
+          body_doc?: Json | null
           video_url?: string | null
           cover_image_url?: string | null
-          sort_order?: number
+          sort_order?: number | null
           status?: string
           published_at?: string | null
-          author_id?: string
+          author_id?: string | null
           origin?: string | null
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      blog_categories: {
+        Row: {
+          id: string
+          website: string
+          slug: string
+          name: string
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          slug: string
+          name: string
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          slug?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      blog_tags: {
+        Row: {
+          id: string
+          website: string
+          slug: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          slug: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          slug?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      post_categories: {
+        Row: { post_id: string; category_id: string }
+        Insert: { post_id: string; category_id: string }
+        Update: { post_id?: string; category_id?: string }
+        Relationships: []
+      }
+      post_tags: {
+        Row: { post_id: string; tag_id: string }
+        Insert: { post_id: string; tag_id: string }
+        Update: { post_id?: string; tag_id?: string }
+        Relationships: []
+      }
+      blog_author_profiles: {
+        Row: {
+          id: string
+          website: string
+          user_id: string
+          slug: string
+          display_name: string
+          bio: string | null
+          avatar_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          user_id: string
+          slug: string
+          display_name: string
+          bio?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          user_id?: string
+          slug?: string
+          display_name?: string
+          bio?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      blog_revisions: {
+        Row: {
+          id: string
+          post_id: string
+          editor_id: string | null
+          title: string
+          slug: string
+          summary: string | null
+          body: string | null
+          body_doc: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          editor_id?: string | null
+          title: string
+          slug: string
+          summary?: string | null
+          body?: string | null
+          body_doc?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          editor_id?: string | null
+          title?: string
+          slug?: string
+          summary?: string | null
+          body?: string | null
+          body_doc?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      blog_media: {
+        Row: {
+          id: string
+          website: string
+          owner_id: string
+          post_id: string | null
+          path: string
+          public_url: string
+          mime: string
+          byte_size: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          owner_id: string
+          post_id?: string | null
+          path: string
+          public_url: string
+          mime: string
+          byte_size: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          owner_id?: string
+          post_id?: string | null
+          path?: string
+          public_url?: string
+          mime?: string
+          byte_size?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      blog_comments: {
+        Row: {
+          id: string
+          post_id: string
+          user_id: string
+          body: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          user_id: string
+          body: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          user_id?: string
+          body?: string
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      newsletter_subscribers: {
+        Row: {
+          id: string
+          website: string
+          email: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          email: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          email?: string
+          status?: string
+          created_at?: string
         }
         Relationships: []
       }

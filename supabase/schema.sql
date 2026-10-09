@@ -2,9 +2,10 @@
 -- Slim starter keep-only schema (Phase 1)
 -- ============================================================================
 -- Consolidated view of supabase/migrations (baseline + later keep-set patches).
--- A second SQL Editor paste of this file is safe: tables and indexes use
--- IF NOT EXISTS, triggers and policies are dropped first, and seeds use
--- ON CONFLICT DO NOTHING. Fresh-project results are unchanged.
+-- NEVER apply this file to production project glplvrljdgowcwuubkau.
+-- A second SQL Editor paste of this file is safe on a fresh starter project:
+-- tables and indexes use IF NOT EXISTS, triggers and policies are dropped
+-- first, and seeds use ON CONFLICT DO NOTHING. Fresh-project results are unchanged.
 -- Apply this file on a NEW empty Supabase project via SQL Editor, or prefer:
 --
 --   npx supabase db push --linked
@@ -507,41 +508,58 @@ COMMENT ON TABLE public.llm_turn_rates IS
 CREATE TABLE IF NOT EXISTS public.posts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   website text NOT NULL,
-  type text NOT NULL DEFAULT 'post'
-    CHECK (char_length(type) BETWEEN 1 AND 40)
-    CHECK (type ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
-  parent_id uuid REFERENCES public.posts(id) ON DELETE SET NULL,
-  title text NOT NULL
-    CHECK (char_length(btrim(title)) BETWEEN 1 AND 200),
-  slug text NOT NULL
-    CHECK (char_length(slug) BETWEEN 1 AND 120)
-    CHECK (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
-  summary text
-    CHECK (summary IS NULL OR char_length(summary) <= 500),
-  body text NOT NULL DEFAULT ''
-    CHECK (char_length(body) <= 200000),
-  video_url text
-    CHECK (video_url IS NULL OR char_length(video_url) <= 2000),
-  cover_image_url text
-    CHECK (cover_image_url IS NULL OR char_length(cover_image_url) <= 2000),
-  sort_order integer NOT NULL DEFAULT 0,
-  status text NOT NULL DEFAULT 'draft'
-    CHECK (status IN ('draft', 'published')),
+  type text NOT NULL,
+  parent_id uuid REFERENCES public.posts(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  slug text NOT NULL,
+  summary text,
+  body text,
+  body_doc jsonb,
+  video_url text,
+  cover_image_url text,
+  sort_order integer,
+  status text NOT NULL DEFAULT 'draft',
   published_at timestamptz,
-  author_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  origin text
-    CHECK (origin IS NULL OR char_length(origin) <= 80),
+  author_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  origin text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT posts_slug_unique UNIQUE (slug),
-  CONSTRAINT posts_parent_not_self CHECK (parent_id IS NULL OR parent_id <> id),
+  CONSTRAINT posts_type_check CHECK (
+    type IN ('course', 'lesson', 'blog')
+  ),
+  CONSTRAINT posts_title_length_check CHECK (
+    char_length(btrim(title)) BETWEEN 1 AND 200
+  ),
+  CONSTRAINT posts_slug_format_check CHECK (
+    slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+  ),
+  CONSTRAINT posts_slug_length_check CHECK (
+    char_length(slug) BETWEEN 2 AND 80
+  ),
+  CONSTRAINT posts_status_check CHECK (
+    status IN ('draft', 'published')
+  ),
+  CONSTRAINT posts_parent_by_type_check CHECK (
+    (type = 'lesson' AND parent_id IS NOT NULL)
+    OR (type IN ('course', 'blog') AND parent_id IS NULL)
+  ),
+  CONSTRAINT posts_origin_owner_check CHECK (
+    (type = 'blog' AND origin IS NULL)
+    OR (
+      type IN ('course', 'lesson')
+      AND (
+        (author_id IS NULL AND origin IS NULL)
+        OR (author_id IS NOT NULL AND origin IN ('ai', 'user', 'fork'))
+      )
+    )
+  ),
   CONSTRAINT posts_website_check CHECK (
     website IN ('edu', 'marketing-agent', 'afterallcare')
   )
 );
 
 COMMENT ON TABLE public.posts IS
-  'Writing model for public pages and posts. Drafts are author-only; published rows are world-readable.';
+  'Shared posts table. Blog rows are type blog, parent_id null, origin null. A published blog is publicly readable only after published_at.';
 
 COMMENT ON COLUMN public.posts.website IS
   'Site that owns the post. Allowed values: edu, marketing-agent, afterallcare. No column default; the deploying app sets POSTS_WEBSITE.';
@@ -996,6 +1014,18 @@ CREATE INDEX IF NOT EXISTS posts_status_published_idx
   WHERE status = 'published';
 CREATE INDEX IF NOT EXISTS posts_website_type_status_idx
   ON public.posts (website, type, status);
+
+CREATE UNIQUE INDEX IF NOT EXISTS posts_root_type_slug_key
+  ON public.posts (type, slug)
+  WHERE parent_id IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS posts_lesson_parent_slug_key
+  ON public.posts (parent_id, slug)
+  WHERE parent_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS posts_blog_public_idx
+  ON public.posts (website, published_at DESC)
+  WHERE type = 'blog' AND status = 'published';
 
 -- ============================================================================
 -- 7. TRIGGERS
@@ -1644,10 +1674,19 @@ ON public.llm_turn_rates FOR ALL TO service_role
 USING (true) WITH CHECK (true);
 
 -- posts
+-- No website literal: a fresh starter database is not the shared project.
 DROP POLICY IF EXISTS "Anyone can read published posts" ON public.posts;
-CREATE POLICY "Anyone can read published posts"
-ON public.posts FOR SELECT TO anon, authenticated
-USING (status = 'published');
+DROP POLICY IF EXISTS posts_select_published_blog ON public.posts;
+CREATE POLICY posts_select_published_blog
+ON public.posts
+FOR SELECT
+TO anon, authenticated
+USING (
+  type = 'blog'
+  AND status = 'published'
+  AND published_at IS NOT NULL
+  AND published_at <= now()
+);
 
 DROP POLICY IF EXISTS "Authors can read own posts" ON public.posts;
 CREATE POLICY "Authors can read own posts"
@@ -1966,3 +2005,545 @@ VALUES
     'Markup stored on llm_turn_rates when a turn is recorded. 0 means no markup. Not a secret.'
   )
 ON CONFLICT (option_name) DO NOTHING;
+
+-- ============================================================================
+-- 12. BLOG TAXONOMY AND AUTHORS
+-- Mirrored from migrations/20261009140200_blog_taxonomy_and_authors.sql.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.blog_categories (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    website text NOT NULL,
+    slug text NOT NULL,
+    name text NOT NULL,
+    description text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT blog_categories_website_check
+        CHECK (website = ANY (ARRAY['edu', 'marketing-agent', 'afterallcare'])),
+    CONSTRAINT blog_categories_slug_check
+        CHECK (char_length(slug) BETWEEN 2 AND 80 AND slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
+    CONSTRAINT blog_categories_name_check
+        CHECK (char_length(btrim(name)) BETWEEN 1 AND 80),
+    CONSTRAINT blog_categories_website_slug_key UNIQUE (website, slug)
+);
+
+CREATE TABLE IF NOT EXISTS public.blog_tags (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    website text NOT NULL,
+    slug text NOT NULL,
+    name text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT blog_tags_website_check
+        CHECK (website = ANY (ARRAY['edu', 'marketing-agent', 'afterallcare'])),
+    CONSTRAINT blog_tags_slug_check
+        CHECK (char_length(slug) BETWEEN 2 AND 80 AND slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
+    CONSTRAINT blog_tags_name_check
+        CHECK (char_length(btrim(name)) BETWEEN 1 AND 80),
+    CONSTRAINT blog_tags_website_slug_key UNIQUE (website, slug)
+);
+
+CREATE TABLE IF NOT EXISTS public.post_categories (
+    post_id uuid NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
+    category_id uuid NOT NULL REFERENCES public.blog_categories(id) ON DELETE CASCADE,
+    PRIMARY KEY (post_id, category_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.post_tags (
+    post_id uuid NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
+    tag_id uuid NOT NULL REFERENCES public.blog_tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (post_id, tag_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.blog_author_profiles (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    website text NOT NULL,
+    user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    slug text NOT NULL,
+    display_name text NOT NULL,
+    bio text,
+    avatar_url text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT blog_author_profiles_website_check
+        CHECK (website = ANY (ARRAY['edu', 'marketing-agent', 'afterallcare'])),
+    CONSTRAINT blog_author_profiles_slug_check
+        CHECK (char_length(slug) BETWEEN 2 AND 80 AND slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
+    CONSTRAINT blog_author_profiles_name_check
+        CHECK (char_length(btrim(display_name)) BETWEEN 1 AND 80),
+    CONSTRAINT blog_author_profiles_website_user_key UNIQUE (website, user_id),
+    CONSTRAINT blog_author_profiles_website_slug_key UNIQUE (website, slug)
+);
+
+ALTER TABLE public.blog_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.blog_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.post_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.post_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.blog_author_profiles ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.blog_categories FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.blog_tags FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.post_categories FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.post_tags FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.blog_author_profiles FROM PUBLIC, anon, authenticated;
+
+GRANT SELECT ON TABLE public.blog_categories TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON TABLE public.blog_categories TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.blog_categories TO service_role;
+
+GRANT SELECT ON TABLE public.blog_tags TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON TABLE public.blog_tags TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.blog_tags TO service_role;
+
+GRANT SELECT ON TABLE public.post_categories TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON TABLE public.post_categories TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.post_categories TO service_role;
+
+GRANT SELECT ON TABLE public.post_tags TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON TABLE public.post_tags TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.post_tags TO service_role;
+
+GRANT SELECT ON TABLE public.blog_author_profiles TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON TABLE public.blog_author_profiles TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.blog_author_profiles TO service_role;
+
+DROP POLICY IF EXISTS blog_categories_select ON public.blog_categories;
+CREATE POLICY blog_categories_select
+ON public.blog_categories
+FOR SELECT
+TO anon, authenticated
+USING (true);
+
+DROP POLICY IF EXISTS blog_categories_write ON public.blog_categories;
+CREATE POLICY blog_categories_write
+ON public.blog_categories
+FOR ALL
+TO authenticated
+USING ((SELECT auth.uid()) IS NOT NULL OR authenticative.is_admin())
+WITH CHECK ((SELECT auth.uid()) IS NOT NULL OR authenticative.is_admin());
+
+DROP POLICY IF EXISTS blog_tags_select ON public.blog_tags;
+CREATE POLICY blog_tags_select
+ON public.blog_tags
+FOR SELECT
+TO anon, authenticated
+USING (true);
+
+DROP POLICY IF EXISTS blog_tags_write ON public.blog_tags;
+CREATE POLICY blog_tags_write
+ON public.blog_tags
+FOR ALL
+TO authenticated
+USING ((SELECT auth.uid()) IS NOT NULL OR authenticative.is_admin())
+WITH CHECK ((SELECT auth.uid()) IS NOT NULL OR authenticative.is_admin());
+
+DROP POLICY IF EXISTS post_categories_select ON public.post_categories;
+CREATE POLICY post_categories_select
+ON public.post_categories
+FOR SELECT
+TO anon, authenticated
+USING (
+    EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND (
+            (
+                p.type = 'blog'
+                AND p.status = 'published'
+                AND p.published_at IS NOT NULL
+                AND p.published_at <= now()
+            )
+            OR p.author_id = (SELECT auth.uid())
+            OR authenticative.is_admin()
+          )
+    )
+);
+
+DROP POLICY IF EXISTS post_categories_write ON public.post_categories;
+CREATE POLICY post_categories_write
+ON public.post_categories
+FOR ALL
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND p.type = 'blog'
+          AND (p.author_id = (SELECT auth.uid()) OR authenticative.is_admin())
+    )
+)
+WITH CHECK (
+    EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND p.type = 'blog'
+          AND (p.author_id = (SELECT auth.uid()) OR authenticative.is_admin())
+    )
+);
+
+DROP POLICY IF EXISTS post_tags_select ON public.post_tags;
+CREATE POLICY post_tags_select
+ON public.post_tags
+FOR SELECT
+TO anon, authenticated
+USING (
+    EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND (
+            (
+                p.type = 'blog'
+                AND p.status = 'published'
+                AND p.published_at IS NOT NULL
+                AND p.published_at <= now()
+            )
+            OR p.author_id = (SELECT auth.uid())
+            OR authenticative.is_admin()
+          )
+    )
+);
+
+DROP POLICY IF EXISTS post_tags_write ON public.post_tags;
+CREATE POLICY post_tags_write
+ON public.post_tags
+FOR ALL
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND p.type = 'blog'
+          AND (p.author_id = (SELECT auth.uid()) OR authenticative.is_admin())
+    )
+)
+WITH CHECK (
+    EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND p.type = 'blog'
+          AND (p.author_id = (SELECT auth.uid()) OR authenticative.is_admin())
+    )
+);
+
+DROP POLICY IF EXISTS blog_author_profiles_select ON public.blog_author_profiles;
+CREATE POLICY blog_author_profiles_select
+ON public.blog_author_profiles
+FOR SELECT
+TO anon, authenticated
+USING (true);
+
+DROP POLICY IF EXISTS blog_author_profiles_insert ON public.blog_author_profiles;
+CREATE POLICY blog_author_profiles_insert
+ON public.blog_author_profiles
+FOR INSERT
+TO authenticated
+WITH CHECK (
+    user_id = (SELECT auth.uid())
+    OR authenticative.is_admin()
+);
+
+DROP POLICY IF EXISTS blog_author_profiles_update ON public.blog_author_profiles;
+CREATE POLICY blog_author_profiles_update
+ON public.blog_author_profiles
+FOR UPDATE
+TO authenticated
+USING (user_id = (SELECT auth.uid()) OR authenticative.is_admin())
+WITH CHECK (user_id = (SELECT auth.uid()) OR authenticative.is_admin());
+
+DROP POLICY IF EXISTS blog_author_profiles_delete ON public.blog_author_profiles;
+CREATE POLICY blog_author_profiles_delete
+ON public.blog_author_profiles
+FOR DELETE
+TO authenticated
+USING (user_id = (SELECT auth.uid()) OR authenticative.is_admin());
+
+DROP TRIGGER IF EXISTS trg_blog_author_profiles_set_updated_at ON public.blog_author_profiles;
+CREATE TRIGGER trg_blog_author_profiles_set_updated_at
+BEFORE UPDATE ON public.blog_author_profiles
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+-- =============================================================================
+-- 13. BLOG REVISIONS
+-- Fresh starter databases only. NEVER apply to glplvrljdgowcwuubkau.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.blog_revisions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    post_id uuid NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
+    editor_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+    title text NOT NULL,
+    slug text NOT NULL,
+    summary text,
+    body text,
+    body_doc jsonb,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS blog_revisions_post_created_idx
+    ON public.blog_revisions (post_id, created_at DESC);
+
+ALTER TABLE public.blog_revisions ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.blog_revisions FROM PUBLIC, anon, authenticated;
+
+GRANT SELECT, INSERT ON TABLE public.blog_revisions TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.blog_revisions TO service_role;
+
+DROP POLICY IF EXISTS blog_revisions_select ON public.blog_revisions;
+CREATE POLICY blog_revisions_select
+ON public.blog_revisions
+FOR SELECT
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND (p.author_id = (SELECT auth.uid()) OR authenticative.is_admin())
+    )
+);
+
+DROP POLICY IF EXISTS blog_revisions_insert ON public.blog_revisions;
+CREATE POLICY blog_revisions_insert
+ON public.blog_revisions
+FOR INSERT
+TO authenticated
+WITH CHECK (
+    editor_id = (SELECT auth.uid())
+    AND EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND p.type = 'blog'
+          AND p.author_id = (SELECT auth.uid())
+    )
+);
+
+-- =============================================================================
+-- 14. BLOG MEDIA
+-- Fresh starter databases only. NEVER apply to glplvrljdgowcwuubkau.
+-- =============================================================================
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'blog-media',
+    'blog-media',
+    true,
+    5242880,
+    ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.blog_media (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    website text NOT NULL,
+    owner_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    post_id uuid REFERENCES public.posts(id) ON DELETE SET NULL,
+    path text NOT NULL,
+    public_url text NOT NULL,
+    mime text NOT NULL,
+    byte_size integer NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT blog_media_website_check
+        CHECK (website = ANY (ARRAY['edu', 'marketing-agent', 'afterallcare'])),
+    CONSTRAINT blog_media_mime_check
+        CHECK (mime = ANY (ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif'])),
+    CONSTRAINT blog_media_size_check
+        CHECK (byte_size > 0 AND byte_size <= 5242880),
+    CONSTRAINT blog_media_path_key UNIQUE (path)
+);
+
+ALTER TABLE public.blog_media ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.blog_media FROM PUBLIC, anon, authenticated;
+
+GRANT SELECT, INSERT ON TABLE public.blog_media TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.blog_media TO service_role;
+
+DROP POLICY IF EXISTS blog_media_owner_select ON public.blog_media;
+CREATE POLICY blog_media_owner_select
+ON public.blog_media
+FOR SELECT
+TO authenticated
+USING (owner_id = (SELECT auth.uid()) OR authenticative.is_admin());
+
+DROP POLICY IF EXISTS blog_media_owner_insert ON public.blog_media;
+CREATE POLICY blog_media_owner_insert
+ON public.blog_media
+FOR INSERT
+TO authenticated
+WITH CHECK (owner_id = (SELECT auth.uid()));
+
+DROP POLICY IF EXISTS blog_media_public_read ON storage.objects;
+CREATE POLICY blog_media_public_read
+ON storage.objects
+FOR SELECT
+TO anon, authenticated
+USING (bucket_id = 'blog-media');
+
+DROP POLICY IF EXISTS blog_media_owner_write ON storage.objects;
+CREATE POLICY blog_media_owner_write
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (
+    bucket_id = 'blog-media'
+    AND (storage.foldername(name))[1] IN ('edu', 'marketing-agent', 'afterallcare')
+    AND (storage.foldername(name))[2] = (SELECT auth.uid())::text
+);
+
+DROP POLICY IF EXISTS blog_media_owner_update ON storage.objects;
+CREATE POLICY blog_media_owner_update
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (
+    bucket_id = 'blog-media'
+    AND (storage.foldername(name))[2] = (SELECT auth.uid())::text
+)
+WITH CHECK (
+    bucket_id = 'blog-media'
+    AND (storage.foldername(name))[1] IN ('edu', 'marketing-agent', 'afterallcare')
+    AND (storage.foldername(name))[2] = (SELECT auth.uid())::text
+);
+
+DROP POLICY IF EXISTS blog_media_owner_delete ON storage.objects;
+CREATE POLICY blog_media_owner_delete
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (
+    bucket_id = 'blog-media'
+    AND (storage.foldername(name))[2] = (SELECT auth.uid())::text
+);
+
+-- ============================================================================
+-- 15. BLOG COMMENTS
+-- Mirrored from migrations/20261009140500_blog_comments.sql.
+-- Fresh starter databases only. NEVER apply to production project glplvrljdgowcwuubkau.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.blog_comments (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    post_id uuid NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
+    user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    body text NOT NULL,
+    status text NOT NULL DEFAULT 'pending',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT blog_comments_body_check
+        CHECK (char_length(btrim(body)) BETWEEN 1 AND 2000),
+    CONSTRAINT blog_comments_status_check
+        CHECK (status = ANY (ARRAY['pending', 'visible', 'hidden']))
+);
+
+ALTER TABLE public.blog_comments ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.blog_comments FROM PUBLIC, anon, authenticated;
+
+GRANT SELECT ON TABLE public.blog_comments TO anon, authenticated;
+GRANT INSERT ON TABLE public.blog_comments TO authenticated;
+GRANT UPDATE (status) ON TABLE public.blog_comments TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.blog_comments TO service_role;
+
+DROP POLICY IF EXISTS blog_comments_public_select ON public.blog_comments;
+CREATE POLICY blog_comments_public_select
+ON public.blog_comments
+FOR SELECT
+TO anon, authenticated
+USING (
+    status = 'visible'
+    AND EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND p.type = 'blog'
+          AND p.status = 'published'
+          AND p.published_at IS NOT NULL
+          AND p.published_at <= now()
+    )
+);
+
+DROP POLICY IF EXISTS blog_comments_author_select ON public.blog_comments;
+CREATE POLICY blog_comments_author_select
+ON public.blog_comments
+FOR SELECT
+TO authenticated
+USING (user_id = (SELECT auth.uid()));
+
+DROP POLICY IF EXISTS blog_comments_admin_select ON public.blog_comments;
+CREATE POLICY blog_comments_admin_select
+ON public.blog_comments
+FOR SELECT
+TO authenticated
+USING (authenticative.is_admin());
+
+DROP POLICY IF EXISTS blog_comments_insert ON public.blog_comments;
+CREATE POLICY blog_comments_insert
+ON public.blog_comments
+FOR INSERT
+TO authenticated
+WITH CHECK (
+    user_id = (SELECT auth.uid())
+    AND status = 'pending'
+    AND EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND p.type = 'blog'
+          AND p.status = 'published'
+          AND p.published_at IS NOT NULL
+          AND p.published_at <= now()
+    )
+);
+
+DROP POLICY IF EXISTS blog_comments_admin_update ON public.blog_comments;
+CREATE POLICY blog_comments_admin_update
+ON public.blog_comments
+FOR UPDATE
+TO authenticated
+USING (authenticative.is_admin())
+WITH CHECK (
+    authenticative.is_admin()
+    AND status = ANY (ARRAY['pending', 'visible', 'hidden'])
+);
+
+-- ============================================================================
+-- 16. NEWSLETTER SUBSCRIBERS
+-- Mirrored from migrations/20261009140600_newsletter_subscribers.sql.
+-- Fresh starter databases only. NEVER apply to production project glplvrljdgowcwuubkau.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.newsletter_subscribers (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    website text NOT NULL,
+    email text NOT NULL,
+    status text NOT NULL DEFAULT 'confirmed',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT newsletter_subscribers_website_check
+        CHECK (website = ANY (ARRAY['edu', 'marketing-agent', 'afterallcare'])),
+    CONSTRAINT newsletter_subscribers_email_check
+        CHECK (email = lower(email) AND email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+    CONSTRAINT newsletter_subscribers_status_check
+        CHECK (status = ANY (ARRAY['confirmed', 'unsubscribed'])),
+    CONSTRAINT newsletter_subscribers_website_email_key UNIQUE (website, email)
+);
+
+ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.newsletter_subscribers FROM PUBLIC, anon, authenticated;
+
+GRANT SELECT ON TABLE public.newsletter_subscribers TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.newsletter_subscribers TO service_role;
+
+DROP POLICY IF EXISTS newsletter_subscribers_admin_select ON public.newsletter_subscribers;
+CREATE POLICY newsletter_subscribers_admin_select
+ON public.newsletter_subscribers
+FOR SELECT
+TO authenticated
+USING (authenticative.is_admin());
