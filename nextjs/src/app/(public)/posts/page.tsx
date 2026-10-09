@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { NewsletterForm } from '@/components/posts/NewsletterForm'
 import { PublishedPostList } from '@/components/posts/PublishedPostList'
 import { listAuthorLinks, listCategoryLinks } from '@/lib/blog-taxonomy'
 import { listPublishedPosts, searchPublishedPosts } from '@/lib/posts-store'
@@ -69,6 +70,7 @@ export default async function PostsPage({ searchParams }: PageProps) {
           </nav>
         ) : null}
         <PublishedPostList posts={posts} />
+        <NewsletterForm />
       </div>
     </div>
   )

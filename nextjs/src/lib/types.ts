@@ -1014,6 +1014,30 @@ export type Database = {
         }
         Relationships: []
       }
+      newsletter_subscribers: {
+        Row: {
+          id: string
+          website: string
+          email: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          email: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          email?: string
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       llm_models_picker: {

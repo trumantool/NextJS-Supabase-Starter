@@ -1,14 +1,6 @@
-type Mark = { type?: string; attrs?: { href?: string } }
+import type { PmNode, TipTapDoc } from '@/app/(dashboard)/documents/lib/types'
 
-type DocNode = {
-  type?: string
-  text?: string
-  content?: DocNode[]
-  marks?: Mark[]
-  attrs?: Record<string, unknown>
-}
-
-export type BlogDoc = { type: 'doc'; content: DocNode[] }
+export type BlogDoc = TipTapDoc
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object'
@@ -24,7 +16,7 @@ export function docFromBody(body: string | null | undefined): BlogDoc {
   return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] }
 }
 
-function inlineToMarkdown(nodes: DocNode[] | undefined): string {
+function inlineToMarkdown(nodes: PmNode[] | undefined): string {
   if (!nodes) return ''
   return nodes
     .map((node) => {
@@ -44,7 +36,7 @@ function inlineToMarkdown(nodes: DocNode[] | undefined): string {
     .join('')
 }
 
-function blockToMarkdown(node: DocNode): string {
+function blockToMarkdown(node: PmNode): string {
   switch (node.type) {
     case 'paragraph':
       return inlineToMarkdown(node.content)

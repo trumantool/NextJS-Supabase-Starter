@@ -42,6 +42,13 @@ export default async function AdminBlogPage() {
     comments = data ?? []
   }
 
+  const { data: subscribers, error: subscriberError } = await supabase
+    .from('newsletter_subscribers')
+    .select('id, email, status, created_at')
+    .eq('website', website)
+    .order('created_at', { ascending: false })
+  if (subscriberError) throw new Error(subscriberError.message)
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -116,6 +123,22 @@ export default async function AdminBlogPage() {
                       </button>
                     </form>
                   </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="mt-10">
+          <h2 className="text-lg font-semibold text-gray-900">Newsletter</h2>
+          {(subscribers ?? []).length === 0 ? (
+            <p className="mt-3 text-sm text-gray-600">No addresses yet.</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-gray-200 rounded-lg bg-white ring-1 ring-gray-200">
+              {(subscribers ?? []).map((subscriber) => (
+                <li key={subscriber.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                  <span className="text-gray-900">{subscriber.email}</span>
+                  <span className="text-gray-500">{subscriber.status}</span>
                 </li>
               ))}
             </ul>

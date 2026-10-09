@@ -332,7 +332,7 @@ async function normalizePost(input: PostInput, _website: PostWebsite, existing?:
       ? existing?.body_doc ?? null
       : input.body_doc === null
         ? null
-        : (input.body_doc as Post['body_doc'])
+        : (input.body_doc as unknown as Post['body_doc'])
 
   const statusRaw = typeof input.status === 'string' ? input.status : existing?.status ?? 'draft'
   if (statusRaw !== 'draft' && statusRaw !== 'published') {

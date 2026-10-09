@@ -23,6 +23,8 @@ import {
   blogMediaObjectPath,
   BLOG_MEDIA_MAX_BYTES,
   normalizeCommentBody,
+  normalizeNewsletterEmail,
+  NEWSLETTER_OK,
 } from './posts.ts'
 import { articleJsonLd, publicSiteOrigin } from './blog-seo.ts'
 import { docFromBody, docToMarkdown } from './blog-doc.ts'
@@ -295,6 +297,34 @@ describe('blog moderation', () => {
     assert.equal(sql.includes('GRANT INSERT ON TABLE public.blog_comments TO anon'), false)
     assert.match(sql, /status = 'pending'/)
     assert.match(sql, /status = 'visible'/)
+  })
+})
+
+describe('comments and newsletter', () => {
+  it('stores a lowercase address and rejects one that is not an email', () => {
+    assert.equal(normalizeNewsletterEmail(' Ada@Example.com '), 'ada@example.com')
+    assert.throws(() => normalizeNewsletterEmail('not-an-email'), /Email must/)
+  })
+
+  it('requires a session before a comment is stored as pending', () => {
+    const route = readFileSync(join(root, 'nextjs/src/app/api/posts/comments/route.ts'), 'utf8')
+    assert.match(route, /status: 401/)
+    assert.match(route, /status: 'pending'/)
+    assert.match(route, /getPublishedPostBySlug/)
+    const list = readFileSync(join(root, 'nextjs/src/lib/blog-comments.ts'), 'utf8')
+    assert.match(list, /\.eq\('status', 'visible'\)/)
+  })
+
+  it('confirms an address without sending mail', () => {
+    const route = readFileSync(join(root, 'nextjs/src/app/api/posts/newsletter/route.ts'), 'utf8')
+    assert.equal(NEWSLETTER_OK, "You're on the list.")
+    assert.match(route, /NEWSLETTER_OK/)
+    assert.match(route, /status: 'confirmed'/)
+    assert.equal(/klaviyo|resend|nodemailer|sendMail/i.test(route), false)
+    const sql = readFileSync(join(root, 'supabase/migrations/20261009140600_newsletter_subscribers.sql'), 'utf8')
+    assert.equal(sql.includes('GRANT INSERT ON TABLE public.newsletter_subscribers TO anon'), false)
+    assert.equal(sql.includes('GRANT INSERT ON TABLE public.newsletter_subscribers TO authenticated'), false)
+    assert.match(sql, /authenticative\.is_admin\(\)/)
   })
 })
 

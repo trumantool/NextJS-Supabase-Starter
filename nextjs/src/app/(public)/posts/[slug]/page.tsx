@@ -1,9 +1,12 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
+import Link from 'next/link'
+import { CommentForm } from '@/components/posts/CommentForm'
+import { listVisibleComments } from '@/lib/blog-comments'
 import { loadPublishedArticle } from '@/lib/blog-taxonomy'
 import { articleJsonLd, postCanonical, publicSiteOrigin } from '@/lib/blog-seo'
+import { createSSRClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +48,11 @@ export default async function PostPage({ params }: PageProps) {
   const { post, categories, tags, author, related } = article
   const origin = publicSiteOrigin(process.env.NEXT_PUBLIC_SITE_ORIGIN)
   const jsonLd = articleJsonLd({ post, authorName: author?.display_name ?? null, origin })
+  const supabase = await createSSRClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const comments = await listVisibleComments(post.id)
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
@@ -108,6 +116,31 @@ export default async function PostPage({ params }: PageProps) {
             </ul>
           </aside>
         ) : null}
+        <section className="mt-12">
+          <h2 className="text-lg font-semibold text-gray-900">Comments</h2>
+          {comments.length === 0 ? (
+            <p className="mt-3 text-sm text-gray-600">No comments yet.</p>
+          ) : (
+            <ul className="mt-3 space-y-4">
+              {comments.map((comment) => (
+                <li key={comment.id} className="rounded-lg bg-white px-4 py-3 ring-1 ring-gray-200">
+                  <p className="whitespace-pre-wrap text-gray-900">{comment.body}</p>
+                  <p className="mt-2 text-xs text-gray-500">{comment.created_at.slice(0, 10)}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {user ? (
+            <CommentForm slug={post.slug} />
+          ) : (
+            <p className="mt-4 text-sm text-gray-600">
+              <Link href="/auth/login" className="hover:underline">
+                Sign in
+              </Link>{' '}
+              to comment.
+            </p>
+          )}
+        </section>
       </article>
     </div>
   )
