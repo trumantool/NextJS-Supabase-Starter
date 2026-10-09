@@ -517,6 +517,8 @@ export type Database = {
           instagram_url: string | null
           youtube_url: string | null
           website_url: string | null
+          application_name: string | null
+          website: string | null
           plan: string
           plan_status: string
           stripe_customer_id: string | null
@@ -540,6 +542,8 @@ export type Database = {
           instagram_url?: string | null
           youtube_url?: string | null
           website_url?: string | null
+          application_name?: string | null
+          website?: string | null
           plan?: string
           plan_status?: string
           stripe_customer_id?: string | null
@@ -563,6 +567,8 @@ export type Database = {
           instagram_url?: string | null
           youtube_url?: string | null
           website_url?: string | null
+          application_name?: string | null
+          website?: string | null
           plan?: string
           plan_status?: string
           stripe_customer_id?: string | null

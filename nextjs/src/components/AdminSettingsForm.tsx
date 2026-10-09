@@ -10,6 +10,12 @@ import type { Tables } from '@/lib/types'
 
 type AdminSetting = Tables<'admin_settings'> & { secret_is_set?: boolean }
 
+/**
+ * Edits every `admin_settings` row, including registration provenance
+ * (`application_name`, `website`). Save writes that option only. Signup
+ * copies the current values onto new `user_data` rows; historical rows
+ * are left unchanged.
+ */
 export function AdminSettingsForm() {
   const [settings, setSettings] = useState<AdminSetting[] | null>(null)
   const [loading, setLoading] = useState(true)

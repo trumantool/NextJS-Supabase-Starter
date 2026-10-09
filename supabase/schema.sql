@@ -61,6 +61,10 @@ AS $$
   );
 $$;
 
+REVOKE EXECUTE ON FUNCTION authenticative.is_user_authenticated() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION authenticative.is_user_authenticated() TO authenticated;
+GRANT EXECUTE ON FUNCTION authenticative.is_user_authenticated() TO service_role;
+
 -- Body references public.user_data; plpgsql is parsed at call time so this
 -- can be created before the table exists.
 CREATE OR REPLACE FUNCTION authenticative.is_admin()
@@ -80,6 +84,9 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION authenticative.is_admin() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION authenticative.is_admin() FROM PUBLIC, anon, authenticated;
+-- Public post_categories and post_tags policies are TO anon and call this.
+GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO anon;
 GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO service_role;
 
@@ -101,6 +108,9 @@ GRANT EXECUTE ON FUNCTION public.set_updated_at() TO service_role;
 -- Seeds required user rows + storage folders for the keep buckets.
 -- SECURITY DEFINER: the auth trigger runs as supabase_auth_admin, which cannot
 -- INSERT into public profile tables.
+-- Registration provenance (application_name, website) is read from admin_settings
+-- at insert time. Later edits to those options do not rewrite existing rows.
+-- website is not user_data.website_url and is not an OAuth/canonical site_url.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -110,12 +120,45 @@ AS $$
 DECLARE
   v_first_name text;
   v_last_name text;
+  v_application_name text;
+  v_website text;
 BEGIN
   v_first_name := NEW.raw_user_meta_data->>'first_name';
   v_last_name := NEW.raw_user_meta_data->>'last_name';
 
-  INSERT INTO public.user_data (user_id, first_name, last_name, email, user_role)
-  VALUES (NEW.id, v_first_name, v_last_name, NEW.email, 'free');
+  -- Missing rows and blank values fall back to the starter defaults.
+  -- SELECT INTO with no match assigns NULL, so COALESCE runs after the lookup.
+  SELECT NULLIF(btrim(option_value), '')
+  INTO v_application_name
+  FROM public.admin_settings
+  WHERE option_name = 'application_name';
+
+  SELECT NULLIF(btrim(option_value), '')
+  INTO v_website
+  FROM public.admin_settings
+  WHERE option_name = 'website';
+
+  v_application_name := COALESCE(v_application_name, 'boilerplate');
+  v_website := COALESCE(v_website, 'nexjsboilerplate.com');
+
+  INSERT INTO public.user_data (
+    user_id,
+    first_name,
+    last_name,
+    email,
+    user_role,
+    application_name,
+    website
+  )
+  VALUES (
+    NEW.id,
+    v_first_name,
+    v_last_name,
+    NEW.email,
+    'free',
+    v_application_name,
+    v_website
+  );
 
   INSERT INTO public.user_settings (user_id, first_name, last_name, email)
   VALUES (NEW.id, v_first_name, v_last_name, NEW.email);
@@ -137,6 +180,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO service_role;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin;
 
@@ -170,6 +214,8 @@ CREATE TABLE IF NOT EXISTS public.user_data (
   instagram_url text,
   youtube_url text,
   website_url text,
+  application_name text DEFAULT 'boilerplate',
+  website text DEFAULT 'nexjsboilerplate.com',
   plan text NOT NULL DEFAULT 'free',
   plan_status text NOT NULL DEFAULT 'inactive',
   stripe_customer_id text,
@@ -194,6 +240,21 @@ COMMENT ON COLUMN public.user_data.youtube_url IS
   'Optional YouTube channel or video URL.';
 COMMENT ON COLUMN public.user_data.website_url IS
   'Optional personal or company website URL.';
+
+-- CREATE TABLE IF NOT EXISTS does not add columns on a second paste.
+ALTER TABLE public.user_data
+  ADD COLUMN IF NOT EXISTS application_name text DEFAULT 'boilerplate';
+ALTER TABLE public.user_data
+  ADD COLUMN IF NOT EXISTS website text DEFAULT 'nexjsboilerplate.com';
+ALTER TABLE public.user_data
+  ALTER COLUMN application_name SET DEFAULT 'boilerplate';
+ALTER TABLE public.user_data
+  ALTER COLUMN website SET DEFAULT 'nexjsboilerplate.com';
+
+COMMENT ON COLUMN public.user_data.application_name IS
+  'Registration provenance: app name copied from admin_settings.application_name at signup. Fallback boilerplate. Admin edits do not rewrite this value.';
+COMMENT ON COLUMN public.user_data.website IS
+  'Registration provenance website copied from admin_settings.website at signup. Fallback nexjsboilerplate.com. Not website_url, and not an OAuth or canonical site URL. Admin edits do not rewrite this value.';
 COMMENT ON COLUMN public.user_data.plan IS
   'Billing plan slug synced from Stripe. free until a subscription is active.';
 COMMENT ON COLUMN public.user_data.plan_status IS
@@ -637,6 +698,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.claim_queued_automation_runs(p_limit integer DEFAULT 5)
@@ -677,6 +739,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.claim_queued_automation_runs(integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.claim_queued_automation_runs(integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_queued_automation_runs(integer) TO service_role;
 
 -- ============================================================================
@@ -934,7 +997,7 @@ COMMENT ON FUNCTION public.record_llm_turn_usage(
 
 REVOKE ALL ON FUNCTION public.record_llm_turn_usage(
   uuid, text, bigint, bigint, uuid, uuid, numeric, numeric, numeric, text
-) FROM PUBLIC, anon;
+) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.record_llm_turn_usage(
   uuid, text, bigint, bigint, uuid, uuid, numeric, numeric, numeric, text
@@ -1732,7 +1795,8 @@ USING (true) WITH CHECK (true);
 -- A column REVOKE does not remove a table-level UPDATE grant (including grants
 -- applied by default privileges at CREATE TABLE). Drop table UPDATE, then grant
 -- only the columns authenticated may write. Billing and token totals stay with
--- service_role and record_llm_turn_usage.
+-- service_role and record_llm_turn_usage. application_name and website are
+-- signup provenance written by handle_new_user and stay off this list.
 REVOKE UPDATE ON public.user_data FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.user_data TO authenticated;
 GRANT UPDATE (
@@ -1968,7 +2032,9 @@ VALUES
   ('support_hours', '', 'text', 'Support Hours', 'Available as the [support_hours] shortcode.'),
   ('phone_number', '', 'text', 'Phone Number', 'Available as the [phone_number] shortcode.'),
   ('privacy_policy', '<h1>Privacy Policy</h1><p>This Privacy Policy explains how [site_title] ("we", "us", or "our") collects, uses, discloses, and safeguards your information when you use our services.</p>', 'textarea', 'Privacy Policy', 'The privacy policy content shown on the /privacy page. Supports shortcodes like [site_title], [company_name], and [support_email].'),
-  ('terms_of_service', '<h1>Terms of Service</h1><p>Welcome to [site_title] ("we", "us", or "our"). By accessing or using our services, you agree to be bound by these Terms of Service.</p>', 'textarea', 'Terms of Service', 'The Terms of Service content shown on the /terms page. Supports shortcodes like [site_title], [company_name], and [support_email].')
+  ('terms_of_service', '<h1>Terms of Service</h1><p>Welcome to [site_title] ("we", "us", or "our"). By accessing or using our services, you agree to be bound by these Terms of Service.</p>', 'textarea', 'Terms of Service', 'The Terms of Service content shown on the /terms page. Supports shortcodes like [site_title], [company_name], and [support_email].'),
+  ('application_name', 'boilerplate', 'text', 'Application Name', 'Stamped onto user_data.application_name for new signups. Changing this does not rewrite existing users. If this value is blank, signup falls back to boilerplate.'),
+  ('website', 'nexjsboilerplate.com', 'text', 'Registration Website', 'Stamped onto user_data.website for new signups. This is registration provenance, not the social profile website_url and not an OAuth or canonical site URL. Changing this does not rewrite existing users. If this value is blank, signup falls back to nexjsboilerplate.com.')
 ON CONFLICT (option_name) DO NOTHING;
 
 INSERT INTO public.app_settings (key, value)
