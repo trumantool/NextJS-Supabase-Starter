@@ -762,13 +762,13 @@ export type Database = {
           title: string
           slug: string
           summary: string | null
-          body: string
+          body: string | null
           video_url: string | null
           cover_image_url: string | null
-          sort_order: number
+          sort_order: number | null
           status: string
           published_at: string | null
-          author_id: string
+          author_id: string | null
           origin: string | null
           created_at: string
           updated_at: string
@@ -776,18 +776,18 @@ export type Database = {
         Insert: {
           id?: string
           website: string
-          type?: string
+          type: string
           parent_id?: string | null
           title: string
           slug: string
           summary?: string | null
-          body?: string
+          body?: string | null
           video_url?: string | null
           cover_image_url?: string | null
-          sort_order?: number
+          sort_order?: number | null
           status?: string
           published_at?: string | null
-          author_id: string
+          author_id?: string | null
           origin?: string | null
           created_at?: string
           updated_at?: string
@@ -800,13 +800,13 @@ export type Database = {
           title?: string
           slug?: string
           summary?: string | null
-          body?: string
+          body?: string | null
           video_url?: string | null
           cover_image_url?: string | null
-          sort_order?: number
+          sort_order?: number | null
           status?: string
           published_at?: string | null
-          author_id?: string
+          author_id?: string | null
           origin?: string | null
           created_at?: string
           updated_at?: string

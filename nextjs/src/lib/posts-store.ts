@@ -2,9 +2,11 @@ import { createSSRClient } from '@/lib/supabase/server'
 import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
 import type { Post } from '@/lib/types'
 import {
+  BLOG_TYPE,
+  SLUG_TAKEN_MESSAGE,
+  isBlogType,
   isHttpUrl,
   isPostSlug,
-  isPostType,
   requirePostWebsite,
   slugifyTitle,
   type PostWebsite,
@@ -16,12 +18,10 @@ export type PostInput = {
   summary?: unknown
   body?: unknown
   type?: unknown
-  parent_id?: unknown
   status?: unknown
   video_url?: unknown
   cover_image_url?: unknown
   sort_order?: unknown
-  origin?: unknown
 }
 
 const LIST_COLUMNS =
@@ -56,22 +56,28 @@ function optionalUrl(value: unknown, label: string): string | null {
   return text
 }
 
-async function uniqueSlug(base: string, website: PostWebsite, ignoreId?: string): Promise<string> {
-  const admin = await createServerAdminClient()
-  let candidate = base
-  for (let n = 2; n < 50; n += 1) {
-    const { data, error } = await admin
-      .from('posts')
-      .select('id')
-      .eq('website', website)
-      .eq('slug', candidate)
-      .maybeSingle()
-    if (error) throw new Error(error.message)
-    if (!data || data.id === ignoreId) return candidate
-    const suffix = `-${n}`
-    candidate = `${base.slice(0, 120 - suffix.length)}${suffix}`
+function throwPostWriteError(error: { message: string; code?: string }): never {
+  if (error.code === '23505' && error.message.includes('posts_root_type_slug_key')) {
+    console.error('posts slug conflict', { constraint: 'posts_root_type_slug_key' })
+    throw new Error(SLUG_TAKEN_MESSAGE)
   }
-  throw new Error('Could not find a unique slug')
+  throw new Error(error.message)
+}
+
+async function assertRootBlogSlugAvailable(slug: string, ignoreId?: string): Promise<void> {
+  const admin = await createServerAdminClient()
+  const { data, error } = await admin
+    .from('posts')
+    .select('id')
+    .eq('type', 'blog')
+    .is('parent_id', null)
+    .eq('slug', slug)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (data && data.id !== ignoreId) {
+    console.error('posts slug conflict', { constraint: 'posts_root_type_slug_key' })
+    throw new Error(SLUG_TAKEN_MESSAGE)
+  }
 }
 
 export type PostListItem = Pick<
@@ -99,6 +105,7 @@ export async function listMyPosts(): Promise<PostListItem[]> {
     .from('posts')
     .select(LIST_COLUMNS)
     .eq('website', website)
+    .eq('type', BLOG_TYPE)
     .order('updated_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []) as PostListItem[]
@@ -114,11 +121,11 @@ export type PublishedPost = {
   title: string
   slug: string
   summary: string | null
-  body: string
+  body: string | null
   cover_image_url: string | null
   video_url: string | null
   published_at: string | null
-  sort_order: number
+  sort_order: number | null
 }
 
 export async function listPublishedPosts(): Promise<PublishedPost[]> {
@@ -128,6 +135,7 @@ export async function listPublishedPosts(): Promise<PublishedPost[]> {
     .from('posts')
     .select(PUBLIC_COLUMNS)
     .eq('website', website)
+    .eq('type', BLOG_TYPE)
     .eq('status', 'published')
     .order('sort_order', { ascending: true })
     .order('published_at', { ascending: false })
@@ -142,6 +150,7 @@ export async function getPublishedPostBySlug(slug: string): Promise<PublishedPos
     .from('posts')
     .select(PUBLIC_COLUMNS)
     .eq('website', website)
+    .eq('type', BLOG_TYPE)
     .eq('status', 'published')
     .eq('slug', slug)
     .maybeSingle()
@@ -157,6 +166,7 @@ export async function getMyPost(id: string): Promise<Post> {
     .from('posts')
     .select('*')
     .eq('website', website)
+    .eq('type', BLOG_TYPE)
     .eq('id', id)
     .maybeSingle()
   if (error) throw new Error(error.message)
@@ -167,14 +177,14 @@ export async function getMyPost(id: string): Promise<Post> {
 export async function createPost(input: PostInput): Promise<Post> {
   const website = currentWebsite()
   const userId = await requireUserId()
-  const fields = await normalizePost(input, userId, website)
+  const fields = await normalizePost(input, website)
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('posts')
     .insert({ ...fields, author_id: userId, website })
     .select('*')
     .single()
-  if (error) throw new Error(error.message)
+  if (error) throwPostWriteError(error)
   return data as Post
 }
 
@@ -183,7 +193,7 @@ export async function updatePost(id: string, input: PostInput): Promise<Post> {
   const userId = await requireUserId()
   const existing = await getMyPost(id)
   if (existing.author_id !== userId || existing.website !== website) throw new Error('Post not found')
-  const fields = await normalizePost(input, userId, website, existing)
+  const fields = await normalizePost(input, website, existing)
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('posts')
@@ -191,9 +201,10 @@ export async function updatePost(id: string, input: PostInput): Promise<Post> {
     .eq('id', id)
     .eq('author_id', userId)
     .eq('website', website)
+    .eq('type', BLOG_TYPE)
     .select('*')
     .single()
-  if (error) throw new Error(error.message)
+  if (error) throwPostWriteError(error)
   return data as Post
 }
 
@@ -207,15 +218,11 @@ export async function deletePost(id: string): Promise<void> {
     .eq('id', id)
     .eq('author_id', userId)
     .eq('website', website)
+    .eq('type', BLOG_TYPE)
   if (error) throw new Error(error.message)
 }
 
-async function normalizePost(
-  input: PostInput,
-  userId: string,
-  website: PostWebsite,
-  existing?: Post
-) {
+async function normalizePost(input: PostInput, _website: PostWebsite, existing?: Post) {
   const title = typeof input.title === 'string' ? input.title.trim() : existing?.title ?? ''
   if (!title || title.length > 200) throw new Error('Title must be 1–200 characters')
 
@@ -224,36 +231,21 @@ async function normalizePost(
       ? input.slug.trim().toLowerCase()
       : existing?.slug ?? slugifyTitle(title)
   if (!isPostSlug(requestedSlug)) {
-    throw new Error('Slug must be lowercase letters, numbers, and hyphens')
+    throw new Error('Slug must be 2–80 lowercase letters, numbers, and hyphens')
   }
-  const slug = await uniqueSlug(requestedSlug, website, existing?.id)
+  await assertRootBlogSlugAvailable(requestedSlug, existing?.id)
 
-  const typeRaw =
-    typeof input.type === 'string' && input.type.trim()
-      ? input.type.trim().toLowerCase()
-      : existing?.type ?? 'post'
-  if (!isPostType(typeRaw)) throw new Error('Type must be a short slug such as post or page')
+  if (input.type != null && input.type !== '' && !isBlogType(String(input.type))) {
+    throw new Error('Type must be blog')
+  }
+  if (existing && existing.type !== BLOG_TYPE) {
+    throw new Error('Type must be blog')
+  }
 
   const summary = optionalText(input.summary ?? existing?.summary ?? null, 500, 'Summary')
   const bodySource = input.body ?? existing?.body ?? ''
-  if (typeof bodySource !== 'string') throw new Error('Body must be text')
-  if (bodySource.length > 200000) throw new Error('Body is too long')
-
-  const parentRaw = input.parent_id === undefined ? existing?.parent_id ?? null : input.parent_id
-  let parent_id: string | null = null
-  if (typeof parentRaw === 'string' && parentRaw.trim()) {
-    parent_id = parentRaw.trim()
-    if (existing && parent_id === existing.id) throw new Error('A post cannot be its own parent')
-    const supabase = await createSSRClient()
-    const { data: parent, error } = await supabase
-      .from('posts')
-      .select('id, author_id')
-      .eq('website', website)
-      .eq('id', parent_id)
-      .maybeSingle()
-    if (error) throw new Error(error.message)
-    if (!parent || parent.author_id !== userId) throw new Error('Parent post was not found')
-  }
+  if (bodySource != null && typeof bodySource !== 'string') throw new Error('Body must be text')
+  if (typeof bodySource === 'string' && bodySource.length > 200000) throw new Error('Body is too long')
 
   const statusRaw = typeof input.status === 'string' ? input.status : existing?.status ?? 'draft'
   if (statusRaw !== 'draft' && statusRaw !== 'published') {
@@ -269,16 +261,13 @@ async function normalizePost(
   const sort_order = typeof sortSource === 'number' ? sortSource : Number(sortSource)
   if (!Number.isInteger(sort_order)) throw new Error('Sort order must be an integer')
 
-  const origin = optionalText(input.origin ?? existing?.origin ?? null, 80, 'Origin')
-
   return {
-    website,
     title,
-    slug,
-    type: typeRaw,
+    slug: requestedSlug,
+    type: BLOG_TYPE,
     summary,
-    body: bodySource,
-    parent_id,
+    body: bodySource ?? '',
+    parent_id: null,
     status: statusRaw,
     published_at,
     video_url: optionalUrl(input.video_url ?? existing?.video_url ?? null, 'Video URL'),
@@ -287,6 +276,6 @@ async function normalizePost(
       'Cover image URL'
     ),
     sort_order,
-    origin,
+    origin: null,
   }
 }

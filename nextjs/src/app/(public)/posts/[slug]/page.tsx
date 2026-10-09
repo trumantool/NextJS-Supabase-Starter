@@ -33,7 +33,7 @@ export default async function PostPage({ params }: PageProps) {
           <img src={post.cover_image_url} alt="" className="mt-8 w-full rounded-lg" />
         ) : null}
         <div className="prose prose-gray mt-8 max-w-none">
-          <ReactMarkdown>{post.body}</ReactMarkdown>
+          <ReactMarkdown>{post.body ?? ''}</ReactMarkdown>
         </div>
         {post.video_url ? (
           <p className="mt-8">

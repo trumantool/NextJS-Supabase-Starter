@@ -4,12 +4,15 @@ import { describe, it } from 'node:test'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  httpStatusForPostError,
+  isBlogType,
   isHttpUrl,
   isPostSlug,
-  isPostType,
   isPostWebsite,
   POSTS_WEBSITE_ERROR,
+  publicSlugConflictMessage,
   requirePostWebsite,
+  SLUG_TAKEN_MESSAGE,
   slugifyTitle,
 } from './posts.ts'
 
@@ -20,20 +23,37 @@ const sqlFiles = [
 ]
 
 describe('slugifyTitle', () => {
-  it('builds a lowercase hyphenated slug', () => {
+  it('builds a lowercase hyphenated slug and slices to 80', () => {
     assert.equal(slugifyTitle('Hello, World!'), 'hello-world')
     assert.equal(slugifyTitle('  Café Notes  '), 'cafe-notes')
     assert.equal(slugifyTitle('***'), 'post')
+    const long = slugifyTitle(`${'word '.repeat(40)}end`)
+    assert.ok(long.length <= 80)
+    assert.equal(long.endsWith('-'), false)
   })
 })
 
 describe('post validators', () => {
-  it('accepts slugs and types within length', () => {
+  it('accepts blog slugs of length 2–80 and rejects the rest', () => {
     assert.equal(isPostSlug('hello-world'), true)
+    assert.equal(isPostSlug('hours-and-payment'), true)
     assert.equal(isPostSlug('Hello'), false)
     assert.equal(isPostSlug(''), false)
-    assert.equal(isPostType('post'), true)
-    assert.equal(isPostType('a'.repeat(41)), false)
+    assert.equal(isPostSlug('a'), false)
+    assert.equal(isPostSlug('a'.repeat(81)), false)
+    assert.equal(isBlogType('blog'), true)
+    assert.equal(isBlogType('post'), false)
+    assert.equal(isBlogType('course'), false)
+  })
+
+  it('maps a root slug clash to a generic 409', () => {
+    const raw =
+      'duplicate key value violates unique constraint "posts_root_type_slug_key"'
+    const mapped = publicSlugConflictMessage(`${raw} afterallcare hours-and-payment`)
+    assert.equal(mapped, SLUG_TAKEN_MESSAGE)
+    assert.equal(mapped.includes('afterallcare'), false)
+    assert.equal(httpStatusForPostError(mapped), 409)
+    assert.equal(SLUG_TAKEN_MESSAGE, 'That address is already in use. Pick another slug.')
   })
 
   it('accepts only the posts_website_check values', () => {
@@ -70,18 +90,45 @@ describe('posts website schema', () => {
       )
       assert.equal(sql.includes("DEFAULT 'edu'"), false)
       assert.equal(sql.includes("website = 'edu'"), false)
+      assert.equal(sql.includes("DEFAULT 'post'"), false)
+      assert.equal(sql.includes('UNIQUE (slug)'), false)
+      assert.match(sql, /posts_root_type_slug_key/)
+      assert.match(sql, /posts_lesson_parent_slug_key/)
+      assert.match(sql, /posts_slug_length_check/)
+      assert.match(sql, /posts_parent_by_type_check/)
+      assert.match(sql, /posts_origin_owner_check/)
+      assert.match(sql, /posts_type_check/)
+      assert.equal(/CREATE POLICY "Anyone can read published posts"/.test(sql), false)
+      const policyAt = sql.indexOf('CREATE POLICY posts_select_published_blog')
+      assert.notEqual(policyAt, -1)
+      const policy = sql.slice(policyAt, policyAt + 450)
+      assert.match(policy, /type = 'blog'/)
+      assert.match(policy, /published_at <= now\(\)/)
+      assert.equal(policy.includes("USING (status = 'published')"), false)
+      assert.equal(sql.includes('glplvrljdgowcwuubkau'), true)
     })
   }
 
   it('post reads filter website and writes set it from POSTS_WEBSITE', () => {
     const store = readFileSync(join(root, 'nextjs/src/lib/posts-store.ts'), 'utf8')
     assert.match(store, /requirePostWebsite\(process\.env\.POSTS_WEBSITE\)/)
+    assert.match(store, /type: BLOG_TYPE/)
+    assert.equal(store.includes("DEFAULT 'post'"), false)
+    assert.equal(store.includes("?? 'post'"), false)
     assert.equal(store.includes("'edu'"), false)
     assert.equal(store.includes('marketing-agent'), false)
     const queries = store.split(".from('posts')").slice(1)
-    assert.equal(queries.length, 9)
+    let rootSlugPrechecks = 0
     for (const query of queries) {
-      assert.match(query, /website/)
+      const chain = query.split('if (error)')[0]
+      if (chain.includes(".is('parent_id', null)")) {
+        assert.match(chain, /\.eq\('type', 'blog'\)/)
+        assert.doesNotMatch(chain, /\.eq\('website'/)
+        rootSlugPrechecks += 1
+        continue
+      }
+      assert.match(chain, /website/)
     }
+    assert.equal(rootSlugPrechecks, 1)
   })
 })

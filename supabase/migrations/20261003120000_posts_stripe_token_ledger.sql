@@ -1,6 +1,7 @@
 -- Posts, Stripe billing columns, and the shared OpenRouter token ledger.
--- Schema files only. Do not apply this to a live database until Truman lifts the hold.
--- Do not apply to Marketing/Edu project glplvrljdgowcwuubkau.
+-- NEVER apply this file to production project glplvrljdgowcwuubkau.
+-- It has not been applied there. The Stripe and token-ledger half would run
+-- against live objects. A fresh starter database is the only target.
 -- Seeds empty admin_settings rows only. No secret values. No course_post_id.
 
 -- ============================================================================
@@ -448,46 +449,67 @@ GRANT EXECUTE ON FUNCTION public.record_llm_turn_usage(
 
 -- ============================================================================
 -- posts
+-- Fresh starter databases only. NEVER apply this section, or this file, to
+-- production project glplvrljdgowcwuubkau. The shape matches the live posts
+-- contract (checks, root slug uniqueness, nullable author). It does not add
+-- the live hierarchy triggers. Those already exist on prod and must not be
+-- replayed from here.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS public.posts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   website text NOT NULL,
-  type text NOT NULL DEFAULT 'post'
-    CHECK (char_length(type) BETWEEN 1 AND 40)
-    CHECK (type ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
-  parent_id uuid REFERENCES public.posts(id) ON DELETE SET NULL,
-  title text NOT NULL
-    CHECK (char_length(btrim(title)) BETWEEN 1 AND 200),
-  slug text NOT NULL
-    CHECK (char_length(slug) BETWEEN 1 AND 120)
-    CHECK (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
-  summary text
-    CHECK (summary IS NULL OR char_length(summary) <= 500),
-  body text NOT NULL DEFAULT ''
-    CHECK (char_length(body) <= 200000),
-  video_url text
-    CHECK (video_url IS NULL OR char_length(video_url) <= 2000),
-  cover_image_url text
-    CHECK (cover_image_url IS NULL OR char_length(cover_image_url) <= 2000),
-  sort_order integer NOT NULL DEFAULT 0,
-  status text NOT NULL DEFAULT 'draft'
-    CHECK (status IN ('draft', 'published')),
+  type text NOT NULL,
+  parent_id uuid REFERENCES public.posts(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  slug text NOT NULL,
+  summary text,
+  body text,
+  video_url text,
+  cover_image_url text,
+  sort_order integer,
+  status text NOT NULL DEFAULT 'draft',
   published_at timestamptz,
-  author_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  origin text
-    CHECK (origin IS NULL OR char_length(origin) <= 80),
+  author_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  origin text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT posts_slug_unique UNIQUE (slug),
-  CONSTRAINT posts_parent_not_self CHECK (parent_id IS NULL OR parent_id <> id),
+  CONSTRAINT posts_type_check CHECK (
+    type IN ('course', 'lesson', 'blog')
+  ),
+  CONSTRAINT posts_title_length_check CHECK (
+    char_length(btrim(title)) BETWEEN 1 AND 200
+  ),
+  CONSTRAINT posts_slug_format_check CHECK (
+    slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+  ),
+  CONSTRAINT posts_slug_length_check CHECK (
+    char_length(slug) BETWEEN 2 AND 80
+  ),
+  CONSTRAINT posts_status_check CHECK (
+    status IN ('draft', 'published')
+  ),
+  CONSTRAINT posts_parent_by_type_check CHECK (
+    (type = 'lesson' AND parent_id IS NOT NULL)
+    OR (type IN ('course', 'blog') AND parent_id IS NULL)
+  ),
+  CONSTRAINT posts_origin_owner_check CHECK (
+    (type = 'blog' AND origin IS NULL)
+    OR (
+      type IN ('course', 'lesson')
+      AND (
+        (author_id IS NULL AND origin IS NULL)
+        OR (author_id IS NOT NULL AND origin IN ('ai', 'user', 'fork'))
+      )
+    )
+  ),
   CONSTRAINT posts_website_check CHECK (
     website IN ('edu', 'marketing-agent', 'afterallcare')
   )
 );
 
 COMMENT ON TABLE public.posts IS
-  'Writing model for public pages and posts. Not blog_posts. Drafts are author-only; published rows are world-readable.';
+  'Shared posts table. Blog rows are type blog, parent_id null, origin null. A published blog is publicly readable only after published_at.';
 
 COMMENT ON COLUMN public.posts.website IS
   'Site that owns the post. Allowed values: edu, marketing-agent, afterallcare. No column default; the deploying app sets POSTS_WEBSITE.';
@@ -499,6 +521,18 @@ CREATE INDEX IF NOT EXISTS posts_status_published_idx
   WHERE status = 'published';
 CREATE INDEX IF NOT EXISTS posts_website_type_status_idx
   ON public.posts (website, type, status);
+
+CREATE UNIQUE INDEX IF NOT EXISTS posts_root_type_slug_key
+  ON public.posts (type, slug)
+  WHERE parent_id IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS posts_lesson_parent_slug_key
+  ON public.posts (parent_id, slug)
+  WHERE parent_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS posts_blog_public_idx
+  ON public.posts (website, published_at DESC)
+  WHERE type = 'blog' AND status = 'published';
 
 DROP TRIGGER IF EXISTS trg_posts_set_updated_at ON public.posts;
 CREATE TRIGGER trg_posts_set_updated_at
@@ -536,10 +570,20 @@ CREATE POLICY "Service role can manage turn rates"
 ON public.llm_turn_rates FOR ALL TO service_role
 USING (true) WITH CHECK (true);
 
+-- Replaces the old "any published row" policy. No website literal: a fresh
+-- starter database is not the shared project. The app filters by POSTS_WEBSITE.
 DROP POLICY IF EXISTS "Anyone can read published posts" ON public.posts;
-CREATE POLICY "Anyone can read published posts"
-ON public.posts FOR SELECT TO anon, authenticated
-USING (status = 'published');
+DROP POLICY IF EXISTS posts_select_published_blog ON public.posts;
+CREATE POLICY posts_select_published_blog
+ON public.posts
+FOR SELECT
+TO anon, authenticated
+USING (
+  type = 'blog'
+  AND status = 'published'
+  AND published_at IS NOT NULL
+  AND published_at <= now()
+);
 
 DROP POLICY IF EXISTS "Authors can read own posts" ON public.posts;
 CREATE POLICY "Authors can read own posts"

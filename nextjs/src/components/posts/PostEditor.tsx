@@ -19,13 +19,10 @@ export function PostEditor({ mode, postId }: EditorProps) {
   const [slug, setSlug] = useState('')
   const [summary, setSummary] = useState('')
   const [body, setBody] = useState('')
-  const [type, setType] = useState('post')
-  const [parentId, setParentId] = useState('')
   const [status, setStatus] = useState<'draft' | 'published'>('draft')
   const [videoUrl, setVideoUrl] = useState('')
   const [coverImageUrl, setCoverImageUrl] = useState('')
   const [sortOrder, setSortOrder] = useState('0')
-  const [origin, setOrigin] = useState('')
 
   useEffect(() => {
     if (mode !== 'edit' || !postId) return
@@ -40,14 +37,11 @@ export function PostEditor({ mode, postId }: EditorProps) {
         setTitle(post.title)
         setSlug(post.slug)
         setSummary(post.summary ?? '')
-        setBody(post.body)
-        setType(post.type)
-        setParentId(post.parent_id ?? '')
+        setBody(post.body ?? '')
         setStatus(post.status === 'published' ? 'published' : 'draft')
         setVideoUrl(post.video_url ?? '')
         setCoverImageUrl(post.cover_image_url ?? '')
-        setSortOrder(String(post.sort_order))
-        setOrigin(post.origin ?? '')
+        setSortOrder(String(post.sort_order ?? 0))
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load post')
       } finally {
@@ -66,13 +60,11 @@ export function PostEditor({ mode, postId }: EditorProps) {
       slug,
       summary,
       body,
-      type,
-      parent_id: parentId,
+      type: 'blog',
       status,
       video_url: videoUrl,
       cover_image_url: coverImageUrl,
       sort_order: Number(sortOrder),
-      origin,
     }
   }
 
@@ -146,12 +138,6 @@ export function PostEditor({ mode, postId }: EditorProps) {
                 className="mt-1"
               />
             </div>
-            <div>
-              <label htmlFor="post-type" className="block text-sm font-medium text-gray-700">
-                Type
-              </label>
-              <Input id="post-type" value={type} onChange={(e) => setType(e.target.value)} className="mt-1" />
-            </div>
           </div>
           <div>
             <label htmlFor="post-summary" className="block text-sm font-medium text-gray-700">
@@ -193,18 +179,6 @@ export function PostEditor({ mode, postId }: EditorProps) {
               />
             </div>
           </div>
-          <div>
-            <label htmlFor="post-parent" className="block text-sm font-medium text-gray-700">
-              Parent post id
-            </label>
-            <Input
-              id="post-parent"
-              value={parentId}
-              onChange={(e) => setParentId(e.target.value)}
-              placeholder="Optional"
-              className="mt-1"
-            />
-          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="post-cover" className="block text-sm font-medium text-gray-700">
@@ -218,12 +192,6 @@ export function PostEditor({ mode, postId }: EditorProps) {
               </label>
               <Input id="post-video" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="mt-1" />
             </div>
-          </div>
-          <div>
-            <label htmlFor="post-origin" className="block text-sm font-medium text-gray-700">
-              Origin
-            </label>
-            <Input id="post-origin" value={origin} onChange={(e) => setOrigin(e.target.value)} className="mt-1" />
           </div>
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
           <div className="flex gap-3">
