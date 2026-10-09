@@ -813,6 +813,105 @@ export type Database = {
         }
         Relationships: []
       }
+      blog_categories: {
+        Row: {
+          id: string
+          website: string
+          slug: string
+          name: string
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          slug: string
+          name: string
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          slug?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      blog_tags: {
+        Row: {
+          id: string
+          website: string
+          slug: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          slug: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          slug?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      post_categories: {
+        Row: { post_id: string; category_id: string }
+        Insert: { post_id: string; category_id: string }
+        Update: { post_id?: string; category_id?: string }
+        Relationships: []
+      }
+      post_tags: {
+        Row: { post_id: string; tag_id: string }
+        Insert: { post_id: string; tag_id: string }
+        Update: { post_id?: string; tag_id?: string }
+        Relationships: []
+      }
+      blog_author_profiles: {
+        Row: {
+          id: string
+          website: string
+          user_id: string
+          slug: string
+          display_name: string
+          bio: string | null
+          avatar_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          user_id: string
+          slug: string
+          display_name: string
+          bio?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          user_id?: string
+          slug?: string
+          display_name?: string
+          bio?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       llm_models_picker: {

@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readdirSync } from 'node:fs'
 import {
   httpStatusForPostError,
+  ilikeContainsPattern,
   isBlogType,
   isHttpUrl,
   isPostSlug,
@@ -130,5 +132,41 @@ describe('posts website schema', () => {
       assert.match(chain, /website/)
     }
     assert.equal(rootSlugPrechecks, 1)
+    assert.match(store, /ilikeContainsPattern/)
+    assert.match(store, /\.eq\('status', 'published'\)/)
+    assert.match(store, /\.lte\('published_at'/)
   })
+})
+
+describe('search escape', () => {
+  it('does not turn a percent sign into a match-all pattern', () => {
+    const pattern = ilikeContainsPattern('%')
+    assert.equal(pattern, '%\\%%')
+    assert.notEqual(pattern, '%%')
+    assert.equal(ilikeContainsPattern('100%_done'), '%100\\%\\_done%')
+  })
+})
+
+describe('additive blog SQL', () => {
+  const dir = join(root, 'supabase/migrations')
+  const files = readdirSync(dir).filter((name) => name.startsWith('2026100914') && name.endsWith('.sql'))
+
+  it('ships the taxonomy migration for fresh databases', () => {
+    assert.ok(files.includes('20261009140200_blog_taxonomy_and_authors.sql'))
+  })
+
+  for (const name of files) {
+    it(`${name} enables RLS, adds no definer, and does not drop live posts constraints`, () => {
+      const sql = readFileSync(join(dir, name), 'utf8')
+      assert.equal(/SECURITY DEFINER/i.test(sql), false)
+      assert.equal(/DROP CONSTRAINT/i.test(sql), false)
+      assert.equal(sql.includes('posts_select_published_curriculum'), false)
+      assert.equal(sql.includes("website = 'marketing-agent'"), false)
+      const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS public\.(\w+)/g)].map((match) => match[1])
+      for (const table of tables) {
+        assert.match(sql, new RegExp(`ALTER TABLE public\\.${table} ENABLE ROW LEVEL SECURITY`))
+        assert.match(sql, new RegExp(`REVOKE ALL ON TABLE public\\.${table} FROM PUBLIC, anon, authenticated`))
+      }
+    })
+  }
 })

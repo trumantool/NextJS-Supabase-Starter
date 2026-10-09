@@ -52,6 +52,15 @@ export function isBlogType(value: string): boolean {
   return value === BLOG_TYPE
 }
 
+/** Escape ILIKE wildcards so a search for `%` is not a match-all. */
+export function escapeIlike(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
+}
+
+export function ilikeContainsPattern(value: string): string {
+  return `%${escapeIlike(value)}%`
+}
+
 export function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value)

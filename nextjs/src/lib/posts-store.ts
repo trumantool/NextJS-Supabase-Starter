@@ -4,6 +4,7 @@ import type { Post } from '@/lib/types'
 import {
   BLOG_TYPE,
   SLUG_TAKEN_MESSAGE,
+  ilikeContainsPattern,
   isBlogType,
   isHttpUrl,
   isPostSlug,
@@ -22,6 +23,8 @@ export type PostInput = {
   video_url?: unknown
   cover_image_url?: unknown
   sort_order?: unknown
+  categories?: unknown
+  tags?: unknown
 }
 
 const LIST_COLUMNS =
@@ -112,7 +115,7 @@ export async function listMyPosts(): Promise<PostListItem[]> {
 }
 
 const PUBLIC_COLUMNS =
-  'id, website, type, title, slug, summary, body, cover_image_url, video_url, published_at, sort_order'
+  'id, website, type, title, slug, summary, body, cover_image_url, video_url, published_at, sort_order, author_id, updated_at'
 
 export type PublishedPost = {
   id: string
@@ -126,6 +129,12 @@ export type PublishedPost = {
   video_url: string | null
   published_at: string | null
   sort_order: number | null
+  author_id: string | null
+  updated_at: string
+}
+
+function liveNow(): string {
+  return new Date().toISOString()
 }
 
 export async function listPublishedPosts(): Promise<PublishedPost[]> {
@@ -137,6 +146,7 @@ export async function listPublishedPosts(): Promise<PublishedPost[]> {
     .eq('website', website)
     .eq('type', BLOG_TYPE)
     .eq('status', 'published')
+    .lte('published_at', liveNow())
     .order('sort_order', { ascending: true })
     .order('published_at', { ascending: false })
   if (error) throw new Error(error.message)
@@ -152,10 +162,29 @@ export async function getPublishedPostBySlug(slug: string): Promise<PublishedPos
     .eq('website', website)
     .eq('type', BLOG_TYPE)
     .eq('status', 'published')
+    .lte('published_at', liveNow())
     .eq('slug', slug)
     .maybeSingle()
   if (error) throw new Error(error.message)
   return (data as PublishedPost | null) ?? null
+}
+
+export async function searchPublishedPosts(query: string): Promise<PublishedPost[]> {
+  const website = currentWebsite()
+  const pattern = ilikeContainsPattern(query.trim())
+  const quoted = `"${pattern.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+  const supabase = await createSSRClient()
+  const { data, error } = await supabase
+    .from('posts')
+    .select(PUBLIC_COLUMNS)
+    .eq('website', website)
+    .eq('type', BLOG_TYPE)
+    .eq('status', 'published')
+    .lte('published_at', liveNow())
+    .or(`title.ilike.${quoted},summary.ilike.${quoted}`)
+    .limit(20)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as PublishedPost[]
 }
 
 export async function getMyPost(id: string): Promise<Post> {

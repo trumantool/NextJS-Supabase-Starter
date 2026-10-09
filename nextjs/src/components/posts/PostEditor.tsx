@@ -23,6 +23,8 @@ export function PostEditor({ mode, postId }: EditorProps) {
   const [videoUrl, setVideoUrl] = useState('')
   const [coverImageUrl, setCoverImageUrl] = useState('')
   const [sortOrder, setSortOrder] = useState('0')
+  const [categories, setCategories] = useState('')
+  const [tags, setTags] = useState('')
 
   useEffect(() => {
     if (mode !== 'edit' || !postId) return
@@ -30,7 +32,12 @@ export function PostEditor({ mode, postId }: EditorProps) {
     async function load() {
       try {
         const res = await fetch(`/api/posts/${postId}`)
-        const data = (await res.json()) as { post?: Post; error?: string }
+        const data = (await res.json()) as {
+          post?: Post
+          categories?: string[]
+          tags?: string[]
+          error?: string
+        }
         if (!res.ok || !data.post) throw new Error(data.error || 'Failed to load post')
         if (cancelled) return
         const post = data.post
@@ -42,6 +49,8 @@ export function PostEditor({ mode, postId }: EditorProps) {
         setVideoUrl(post.video_url ?? '')
         setCoverImageUrl(post.cover_image_url ?? '')
         setSortOrder(String(post.sort_order ?? 0))
+        setCategories((data.categories ?? []).join(', '))
+        setTags((data.tags ?? []).join(', '))
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load post')
       } finally {
@@ -65,6 +74,8 @@ export function PostEditor({ mode, postId }: EditorProps) {
       video_url: videoUrl,
       cover_image_url: coverImageUrl,
       sort_order: Number(sortOrder),
+      categories,
+      tags,
     }
   }
 
@@ -144,6 +155,32 @@ export function PostEditor({ mode, postId }: EditorProps) {
               Summary
             </label>
             <Textarea id="post-summary" value={summary} onChange={(e) => setSummary(e.target.value)} rows={2} className="mt-1" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="post-categories" className="block text-sm font-medium text-gray-700">
+                Categories
+              </label>
+              <Input
+                id="post-categories"
+                value={categories}
+                onChange={(e) => setCategories(e.target.value)}
+                placeholder="Comma-separated"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label htmlFor="post-tags" className="block text-sm font-medium text-gray-700">
+                Tags
+              </label>
+              <Input
+                id="post-tags"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="Comma-separated"
+                className="mt-1"
+              />
+            </div>
           </div>
           <div>
             <label htmlFor="post-body" className="block text-sm font-medium text-gray-700">
