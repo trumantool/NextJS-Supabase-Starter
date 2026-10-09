@@ -1,6 +1,9 @@
 -- Registration provenance on public.user_data.
 -- Schema files only: this migration is not applied to a live database by this change.
 --
+-- Runs after 20261003120000, which replaces handle_new_user. This definition
+-- keeps that storage-marker exception and stamps application_name / website.
+--
 -- user_data.website is the site stamped at signup. It is not user_data.website_url
 -- (social profile) and it is not an OAuth/canonical site_url admin option.
 -- Editing the admin_settings rows below does not rewrite existing user_data rows.
@@ -43,8 +46,7 @@ ALTER TABLE public.user_data
 ALTER TABLE public.user_data
   ALTER COLUMN website SET DEFAULT 'nexjsboilerplate.com';
 
--- Same body as supabase/schema.sql handle_new_user(). Replacing the function
--- keeps the existing on_auth_user_created trigger pointed at this definition.
+-- Same body as supabase/schema.sql handle_new_user().
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -97,24 +99,54 @@ BEGIN
   INSERT INTO public.user_settings (user_id, first_name, last_name, email)
   VALUES (NEW.id, v_first_name, v_last_name, NEW.email);
 
-  -- Folder markers so storage policies can scope {auth.uid()}/…
-  INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-  VALUES
-    ('user-files', NEW.id::text || '/', NEW.id, '{"eTag": true}'),
-    ('files', NEW.id::text || '/', NEW.id, '{"eTag": true}'),
-    ('agent-skills', NEW.id::text || '/', NEW.id, '{"eTag": true}'),
-    ('agent-memory', NEW.id::text || '/', NEW.id, '{"eTag": true}');
+  -- Folder markers are best-effort. Their failure must not roll back the profile rows above.
+  BEGIN
+    INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+    VALUES
+      ('user-files', NEW.id::text || '/', NEW.id, '{"eTag": true}'),
+      ('files', NEW.id::text || '/', NEW.id, '{"eTag": true}'),
+      ('agent-skills', NEW.id::text || '/', NEW.id, '{"eTag": true}'),
+      ('agent-memory', NEW.id::text || '/', NEW.id, '{"eTag": true}');
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'handle_new_user storage markers skipped: %', SQLERRM;
+  END;
 
-  RETURN NEW;
-EXCEPTION WHEN OTHERS THEN
-  RAISE WARNING 'Error in handle_new_user: %', SQLERRM;
   RETURN NEW;
 END;
 $$;
 
 REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO service_role;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin;
+
+-- Same privilege shape as schema.sql. Revoke first, then restore the roles
+-- that RLS or the app actually call. handle_new_user stays trigger-only.
+REVOKE EXECUTE ON FUNCTION authenticative.is_user_authenticated() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION authenticative.is_user_authenticated() TO authenticated;
+GRANT EXECUTE ON FUNCTION authenticative.is_user_authenticated() TO service_role;
+
+REVOKE ALL ON FUNCTION authenticative.is_admin() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION authenticative.is_admin() FROM PUBLIC, anon, authenticated;
+-- Public post_categories and post_tags policies are TO anon and call this.
+GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO anon;
+GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO service_role;
+
+REVOKE ALL ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) TO service_role;
+
+REVOKE ALL ON FUNCTION public.claim_queued_automation_runs(integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.claim_queued_automation_runs(integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_queued_automation_runs(integer) TO service_role;
+
+REVOKE ALL ON FUNCTION public.record_llm_turn_usage(
+  uuid, text, bigint, bigint, uuid, uuid, numeric, numeric, numeric, text
+) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_llm_turn_usage(
+  uuid, text, bigint, bigint, uuid, uuid, numeric, numeric, numeric, text
+) TO authenticated, service_role;
 
 INSERT INTO public.admin_settings (option_name, option_value, option_field_type, option_title, option_description)
 VALUES
@@ -134,12 +166,13 @@ VALUES
   )
 ON CONFLICT (option_name) DO NOTHING;
 
--- Table-level UPDATE would let the owner rewrite the signup stamp. Keep
--- profile and social columns editable; leave application_name and website
--- off this list. Service role is unchanged (full UPDATE from the baseline).
-REVOKE UPDATE ON TABLE public.user_data FROM authenticated;
+-- Table-level UPDATE would let the owner rewrite the signup stamp, billing
+-- columns, or token totals. Match schema.sql: profile and social columns
+-- only. Service role keeps full UPDATE from the baseline.
+REVOKE UPDATE ON public.user_data FROM PUBLIC, anon, authenticated;
 
 GRANT UPDATE (
+  user_id,
   user_role,
   first_name,
   last_name,

@@ -11,6 +11,7 @@ import {
   type ChatAttachment,
 } from '@/lib/chat-messages'
 import { getValidChatModel, streamChatCompletion } from '@/lib/chat-openrouter'
+import { recordLlmTurnUsage } from '@/lib/llm-usage'
 import { loadAgentSkills } from '@/lib/load-agent-skills'
 import { isUuid } from '@/lib/ids'
 import { createSSRClient } from '@/lib/supabase/server'
@@ -171,21 +172,31 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
         }
         try {
-          const full = await streamChatCompletion({
+          const result = await streamChatCompletion({
             model: modelId,
             messages: openrouterMessages,
             onChunk: (delta) => send({ delta }),
             userId: user.id,
           })
-          const { error: insertAssistantError } = await supabase.from('messages').insert({
-            chat_id: chat.id,
-            role: 'assistant',
-            content: contentToJson(buildAssistantContent(full)),
-          })
-          if (insertAssistantError) {
+          const { data: saved, error: insertAssistantError } = await supabase
+            .from('messages')
+            .insert({
+              chat_id: chat.id,
+              role: 'assistant',
+              content: contentToJson(buildAssistantContent(result.text)),
+            })
+            .select('id')
+            .single()
+          if (insertAssistantError || !saved) {
             console.error('Failed to save assistant message:', insertAssistantError)
             send({ error: 'Reply generated but failed to save.' })
           } else {
+            await recordLlmTurnUsage(supabase, {
+              userId: user.id,
+              modelId,
+              usage: result.usage,
+              messageId: saved.id,
+            })
             send({ done: true, chatId: chat.id })
           }
         } catch (err) {

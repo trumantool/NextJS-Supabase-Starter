@@ -23,11 +23,18 @@ export async function POST(request: NextRequest) {
     // Build a compact representation of the current doc for context.
     const docText = summarizeDoc(body.doc)
 
-    const system = [
-      'You are a writing assistant. You help users draft, improve, and edit document content.',
-      'Respond with plain text only. Use simple formatting: headings on their own line, bullet points starting with "-".',
-      'Be concise and specific. Do not invent facts the user did not provide.',
-    ].join(' ')
+    const system =
+      body.purpose === 'blog'
+        ? [
+            'You are a blog editor. Help the author draft, tighten, and structure a public post.',
+            'Respond with plain text only. Use headings on their own line and bullet points starting with "-".',
+            'Do not invent facts the user did not provide.',
+          ].join(' ')
+        : [
+            'You are a writing assistant. You help users draft, improve, and edit document content.',
+            'Respond with plain text only. Use simple formatting: headings on their own line, bullet points starting with "-".',
+            'Be concise and specific. Do not invent facts the user did not provide.',
+          ].join(' ')
 
     const userMsg = [
       docText ? `Current document content:\n${docText}\n` : '',

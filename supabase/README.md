@@ -8,8 +8,12 @@ This repo ships a real `supabase/migrations/` history starting at:
 
 - [`migrations/20260913223000_slim_starter_baseline.sql`](./migrations/20260913223000_slim_starter_baseline.sql)
 - [`migrations/20260913224500_byok_column_privileges.sql`](./migrations/20260913224500_byok_column_privileges.sql) — `openrouter_api_key` is service-role only
-- [`migrations/20260919123000_user_data_social_profile_urls.sql`](./migrations/20260919123000_user_data_social_profile_urls.sql) — optional social profile URLs, including `website_url`
-- [`migrations/20260926223000_user_data_registration_provenance.sql`](./migrations/20260926223000_user_data_registration_provenance.sql) — signup provenance columns `application_name` and `website`
+- [`migrations/20260919123000_user_data_social_profile_urls.sql`](./migrations/20260919123000_user_data_social_profile_urls.sql) — optional social URL columns, including `website_url`
+- [`migrations/20261003120000_posts_stripe_token_ledger.sql`](./migrations/20261003120000_posts_stripe_token_ledger.sql) — `posts` (including `website text not null`, check `posts_website_check`, index `posts_website_type_status_idx`), Stripe columns on `user_data`, token ledger, empty OpenRouter admin settings
+- [`migrations/20261009140100_posts_body_doc.sql`](./migrations/20261009140100_posts_body_doc.sql) through [`migrations/20261009140600_newsletter_subscribers.sql`](./migrations/20261009140600_newsletter_subscribers.sql) — blog `body_doc`, taxonomy, revisions, media, comments, and newsletter subscribers
+- [`migrations/20261009150000_user_data_registration_provenance.sql`](./migrations/20261009150000_user_data_registration_provenance.sql) — signup provenance columns `application_name` and `website`. Runs after the posts migration, which replaces `handle_new_user`.
+
+Apply these only on a new empty project you control. Do not apply them to Marketing Agent (`glplvrljdgowcwuubkau`) or any other live database from this change.
 
 Together these are the keep-only schema (documents, not resumes; no contact/assessment/Composio tables).
 
@@ -25,7 +29,7 @@ npx supabase db push --linked
 
 ## Consolidated view
 
-[`schema.sql`](./schema.sql) is the consolidated schema (baseline plus later migrations), kept as a single-file view for reading and optional SQL Editor apply on an empty project. Prefer migrations for forks. Do not re-run `schema.sql` on a project that already applied migrations.
+[`schema.sql`](./schema.sql) is the consolidated schema (baseline plus later migrations), kept as a single-file view. A second SQL Editor paste is safe: tables and indexes use IF NOT EXISTS, triggers and policies are dropped first, and seeds use ON CONFLICT DO NOTHING. Prefer migrations for forks.
 
 ## Storage buckets
 

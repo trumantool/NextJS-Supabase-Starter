@@ -19,7 +19,7 @@ Required keys and comments: [`.env.template`](./.env.template). Include `CRON_SE
 
 Keep surfaces: Files (`user-files`, `{userId}/{sanitizedFileName}`), chat attachments (`files`, `{userId}/chat-attachments/{chatId}/…`), To Do (`/todos`; `/table` redirects), Documents, Chat, Agents / Skills / Templates, Automations, User Settings, Admin.
 
-OpenRouter BYOK is saved through `/api/user/byok-key` and stored in `user_settings.openrouter_api_key` (service role only). Chat and automations inject skill markdown as system context. No Composio tools.
+OpenRouter BYOK is saved through `/api/user/byok-key` and stored in `user_settings.openrouter_api_key` (service role only). Resolution is BYOK, then `admin_settings.openrouter_api_key`, then `OPENROUTER_API_KEY`, unless `openrouter_force_platform_key` is true. Chat and automations record token usage with `record_llm_turn_usage`. Posts are authored at `/my-posts` and published at `/posts`. Every post read filters `posts.website`, and every insert or update sets it, from the required server env `POSTS_WEBSITE` (`edu`, `marketing-agent`, or `afterallcare`). That variable has no default. Public post pages render on each request, so `next build` does not choose a site. Stripe billing is on User Settings. No Composio tools.
 
 ## Security
 
