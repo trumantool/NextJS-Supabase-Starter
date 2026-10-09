@@ -22,6 +22,7 @@ import {
   blogMediaExtension,
   blogMediaObjectPath,
   BLOG_MEDIA_MAX_BYTES,
+  normalizeCommentBody,
 } from './posts.ts'
 import { articleJsonLd, publicSiteOrigin } from './blog-seo.ts'
 import { docFromBody, docToMarkdown } from './blog-doc.ts'
@@ -273,12 +274,38 @@ describe('public site origin', () => {
   })
 })
 
+describe('blog moderation', () => {
+  it('keeps a comment inside 1–2000 characters', () => {
+    assert.equal(normalizeCommentBody('  hello  '), 'hello')
+    assert.throws(() => normalizeCommentBody('   '), /Comment must/)
+    assert.throws(() => normalizeCommentBody('a'.repeat(2001)), /Comment must/)
+  })
+
+  it('sends a non-admin to the dashboard', () => {
+    const page = readFileSync(join(root, 'nextjs/src/app/(dashboard)/admin/blog/page.tsx'), 'utf8')
+    assert.match(page, /isCurrentUserAdmin/)
+    assert.match(page, /redirect\('\/dashboard'\)/)
+    assert.match(page, /\.eq\('type', 'blog'\)/)
+  })
+
+  it('unpublishes without clearing published_at and does not let anon insert comments', () => {
+    const actions = readFileSync(join(root, 'nextjs/src/app/(dashboard)/admin/blog/actions.ts'), 'utf8')
+    assert.match(actions, /\.update\(\{ status: 'draft' \}\)/)
+    const sql = readFileSync(join(root, 'supabase/migrations/20261009140500_blog_comments.sql'), 'utf8')
+    assert.equal(sql.includes('GRANT INSERT ON TABLE public.blog_comments TO anon'), false)
+    assert.match(sql, /status = 'pending'/)
+    assert.match(sql, /status = 'visible'/)
+  })
+})
+
 describe('additive blog SQL', () => {
   const dir = join(root, 'supabase/migrations')
   const files = readdirSync(dir).filter((name) => name.startsWith('2026100914') && name.endsWith('.sql'))
 
   it('ships the taxonomy migration for fresh databases', () => {
     assert.ok(files.includes('20261009140200_blog_taxonomy_and_authors.sql'))
+    const schema = readFileSync(join(root, 'supabase/schema.sql'), 'utf8')
+    assert.match(schema, /CREATE TABLE IF NOT EXISTS public\.blog_categories/)
   })
 
   for (const name of files) {

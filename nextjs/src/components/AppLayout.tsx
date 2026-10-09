@@ -63,6 +63,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const adminMenuItems = isAdmin
         ? [
             { name: 'Admin Settings', href: '/admin', icon: Settings },
+            { name: 'Blog', href: '/admin/blog', icon: Newspaper },
             { name: 'Agent Templates', href: '/admin?tab=templates', icon: LayoutTemplate },
           ]
         : [];

@@ -987,6 +987,33 @@ export type Database = {
         }
         Relationships: []
       }
+      blog_comments: {
+        Row: {
+          id: string
+          post_id: string
+          user_id: string
+          body: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          user_id: string
+          body: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          user_id?: string
+          body?: string
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       llm_models_picker: {

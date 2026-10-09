@@ -166,6 +166,26 @@ export function blogSlugsToRefresh(
   return slugs
 }
 
+export function normalizeCommentBody(value: unknown): string {
+  if (typeof value !== 'string') throw new Error('Comment must be 1–2000 characters')
+  const body = value.trim()
+  if (body.length < 1 || body.length > 2000) throw new Error('Comment must be 1–2000 characters')
+  return body
+}
+
+const NEWSLETTER_EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+export const NEWSLETTER_OK = "You're on the list."
+
+export function normalizeNewsletterEmail(value: unknown): string {
+  if (typeof value !== 'string') throw new Error('Email must be an address')
+  const email = value.trim().toLowerCase()
+  if (email.length > 320 || !NEWSLETTER_EMAIL.test(email)) {
+    throw new Error('Email must be an address')
+  }
+  return email
+}
+
 export function httpStatusForPostError(message: string): number {
   if (message === 'Unauthorized') return 401
   if (message === SLUG_TAKEN_MESSAGE) return 409
