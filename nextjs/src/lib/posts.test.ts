@@ -18,6 +18,10 @@ import {
   resolvePublication,
   isLivePublication,
   blogSlugsToRefresh,
+  assertBlogMedia,
+  blogMediaExtension,
+  blogMediaObjectPath,
+  BLOG_MEDIA_MAX_BYTES,
 } from './posts.ts'
 import { articleJsonLd, publicSiteOrigin } from './blog-seo.ts'
 
@@ -178,6 +182,18 @@ describe('publication', () => {
       ),
       ['old', 'new']
     )
+  })
+})
+
+describe('blog media', () => {
+  it('rejects a non-image and a file over 5 MB', () => {
+    assert.equal(blogMediaExtension('image/svg+xml'), null)
+    assert.throws(() => assertBlogMedia('image/svg+xml', 100), /must be jpeg/)
+    assert.throws(() => assertBlogMedia('text/plain', 100), /must be jpeg/)
+    assert.throws(() => assertBlogMedia('image/png', BLOG_MEDIA_MAX_BYTES + 1), /5 MB/)
+    assert.equal(assertBlogMedia('image/png', 100), 'png')
+    assert.equal(httpStatusForPostError('Cover image must be jpeg, png, webp, or gif'), 400)
+    assert.equal(blogMediaObjectPath('edu', 'user-1', 'abc', 'png').startsWith('edu/user-1/'), true)
   })
 })
 

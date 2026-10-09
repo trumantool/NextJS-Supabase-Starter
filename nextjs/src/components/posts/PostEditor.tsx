@@ -123,6 +123,23 @@ export function PostEditor({ mode, postId }: EditorProps) {
     }
   }
 
+  async function uploadCover(file: File) {
+    setSaving(true)
+    setError('')
+    try {
+      const form = new FormData()
+      form.set('file', file)
+      const res = await fetch('/api/posts/media', { method: 'POST', body: form })
+      const data = (await res.json()) as { url?: string; error?: string }
+      if (!res.ok || !data.url) throw new Error(data.error || 'Failed to upload image')
+      setCoverImageUrl(data.url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload image')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleDelete() {
     if (!postId) return
     if (!window.confirm('Delete this post?')) return
@@ -253,6 +270,16 @@ export function PostEditor({ mode, postId }: EditorProps) {
                 Cover image URL
               </label>
               <Input id="post-cover" value={coverImageUrl} onChange={(e) => setCoverImageUrl(e.target.value)} className="mt-1" />
+              <input
+                id="post-cover-file"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="mt-2 block text-sm"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) void uploadCover(file)
+                }}
+              />
             </div>
             <div>
               <label htmlFor="post-video" className="block text-sm font-medium text-gray-700">

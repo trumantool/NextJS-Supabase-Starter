@@ -81,6 +81,33 @@ export function publicSlugConflictMessage(raw: string): string {
   return raw
 }
 
+export const BLOG_MEDIA_MAX_BYTES = 5 * 1024 * 1024
+
+const BLOG_MEDIA_EXTENSIONS: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+}
+
+export function blogMediaExtension(mime: string): string | null {
+  if (mime === 'image/svg+xml') return null
+  return BLOG_MEDIA_EXTENSIONS[mime] ?? null
+}
+
+export function assertBlogMedia(mime: string, byteSize: number): string {
+  const ext = blogMediaExtension(mime)
+  if (!ext) throw new Error('Cover image must be jpeg, png, webp, or gif')
+  if (!Number.isFinite(byteSize) || byteSize <= 0 || byteSize > BLOG_MEDIA_MAX_BYTES) {
+    throw new Error('Cover image must be 5 MB or smaller')
+  }
+  return ext
+}
+
+export function blogMediaObjectPath(website: string, userId: string, id: string, ext: string): string {
+  return `${website}/${userId}/${id}.${ext}`
+}
+
 export function isLivePublication(
   status: string,
   publishedAt: string | null,

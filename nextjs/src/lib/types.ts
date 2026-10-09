@@ -948,6 +948,42 @@ export type Database = {
         }
         Relationships: []
       }
+      blog_media: {
+        Row: {
+          id: string
+          website: string
+          owner_id: string
+          post_id: string | null
+          path: string
+          public_url: string
+          mime: string
+          byte_size: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          owner_id: string
+          post_id?: string | null
+          path: string
+          public_url: string
+          mime: string
+          byte_size: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          owner_id?: string
+          post_id?: string | null
+          path?: string
+          public_url?: string
+          mime?: string
+          byte_size?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       llm_models_picker: {
