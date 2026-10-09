@@ -1,17 +1,41 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import { loadPublishedArticle } from '@/lib/blog-taxonomy'
+import { articleJsonLd, postCanonical, publicSiteOrigin } from '@/lib/blog-seo'
 
 export const dynamic = 'force-dynamic'
 
 type PageProps = { params: Promise<{ slug: string }> }
 
-export async function generateMetadata({ params }: PageProps) {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
   const article = await loadPublishedArticle(slug)
   if (!article) return { title: 'Post' }
-  return { title: article.post.title, description: article.post.summary ?? undefined }
+  const { post } = article
+  const origin = publicSiteOrigin(process.env.NEXT_PUBLIC_SITE_ORIGIN)
+  const canonical = postCanonical(origin, post.slug)
+  const images = post.cover_image_url ? [post.cover_image_url] : undefined
+  return {
+    title: post.title,
+    description: post.summary ?? undefined,
+    alternates: canonical ? { canonical } : undefined,
+    openGraph: {
+      type: 'article',
+      title: post.title,
+      description: post.summary ?? undefined,
+      ...(canonical ? { url: canonical } : {}),
+      publishedTime: post.published_at ?? undefined,
+      images,
+    },
+    twitter: {
+      card: images ? 'summary_large_image' : 'summary',
+      title: post.title,
+      description: post.summary ?? undefined,
+      images,
+    },
+  }
 }
 
 export default async function PostPage({ params }: PageProps) {
@@ -19,9 +43,12 @@ export default async function PostPage({ params }: PageProps) {
   const article = await loadPublishedArticle(slug)
   if (!article) notFound()
   const { post, categories, tags, author, related } = article
+  const origin = publicSiteOrigin(process.env.NEXT_PUBLIC_SITE_ORIGIN)
+  const jsonLd = articleJsonLd({ post, authorName: author?.display_name ?? null, origin })
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <article className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <Link href="/posts" className="text-sm text-gray-600 hover:underline">
           All posts

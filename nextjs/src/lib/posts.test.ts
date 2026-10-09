@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { describe, it } from 'node:test'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readdirSync } from 'node:fs'
 import {
   httpStatusForPostError,
   ilikeContainsPattern,
@@ -17,6 +16,7 @@ import {
   SLUG_TAKEN_MESSAGE,
   slugifyTitle,
 } from './posts.ts'
+import { articleJsonLd, publicSiteOrigin } from './blog-seo.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const sqlFiles = [
@@ -144,6 +144,48 @@ describe('search escape', () => {
     assert.equal(pattern, '%\\%%')
     assert.notEqual(pattern, '%%')
     assert.equal(ilikeContainsPattern('100%_done'), '%100\\%\\_done%')
+  })
+})
+
+describe('public site origin', () => {
+  it('omits a host when the env value is empty', () => {
+    assert.equal(publicSiteOrigin(undefined), null)
+    assert.equal(publicSiteOrigin(''), null)
+    assert.equal(publicSiteOrigin('   '), null)
+    assert.equal(publicSiteOrigin('not a url'), null)
+    assert.equal(publicSiteOrigin('https://example.com/blog'), 'https://example.com')
+  })
+
+  it('describes a live post with BlogPosting and BreadcrumbList', () => {
+    const blocks = articleJsonLd({
+      post: {
+        title: 'Hours',
+        summary: 'Payment notes',
+        slug: 'hours',
+        published_at: '2026-10-01T00:00:00.000Z',
+        updated_at: '2026-10-02T00:00:00.000Z',
+        cover_image_url: null,
+      },
+      authorName: 'Ada',
+      origin: 'https://example.com',
+    })
+    const types = blocks.map((block) => block['@type'])
+    assert.deepEqual(types, ['BlogPosting', 'BreadcrumbList'])
+    const crumbs = blocks[1].itemListElement as Array<{ name: string }>
+    assert.deepEqual(
+      crumbs.map((item) => item.name),
+      ['Home', 'Blog', 'Hours']
+    )
+  })
+
+  it('serves RSS only when an origin is configured and lists live posts', () => {
+    const rss = readFileSync(join(root, 'nextjs/src/app/(public)/posts/rss.xml/route.ts'), 'utf8')
+    assert.match(rss, /status: 503/)
+    assert.match(rss, /listPublishedPosts/)
+    const robots = readFileSync(join(root, 'nextjs/src/app/robots.ts'), 'utf8')
+    assert.match(robots, /\/my-posts/)
+    assert.equal(robots.includes("'/posts'"), false)
+    assert.equal(robots.includes('"/posts"'), false)
   })
 })
 
