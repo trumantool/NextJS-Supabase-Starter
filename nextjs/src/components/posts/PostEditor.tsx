@@ -10,6 +10,14 @@ import type { Post } from '@/lib/types'
 
 type EditorProps = { mode: 'new' | 'edit'; postId?: string }
 
+function toLocalInput(iso: string | null): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 export function PostEditor({ mode, postId }: EditorProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(mode === 'edit')
@@ -25,6 +33,7 @@ export function PostEditor({ mode, postId }: EditorProps) {
   const [sortOrder, setSortOrder] = useState('0')
   const [categories, setCategories] = useState('')
   const [tags, setTags] = useState('')
+  const [scheduleAt, setScheduleAt] = useState('')
 
   useEffect(() => {
     if (mode !== 'edit' || !postId) return
@@ -51,6 +60,7 @@ export function PostEditor({ mode, postId }: EditorProps) {
         setSortOrder(String(post.sort_order ?? 0))
         setCategories((data.categories ?? []).join(', '))
         setTags((data.tags ?? []).join(', '))
+        setScheduleAt(toLocalInput(post.published_at))
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load post')
       } finally {
@@ -63,14 +73,28 @@ export function PostEditor({ mode, postId }: EditorProps) {
     }
   }, [mode, postId])
 
-  function payload() {
+  function payload(action: 'draft' | 'publish' | 'schedule' | 'unpublish') {
+    let nextStatus: 'draft' | 'published' = 'draft'
+    let published_at: string | undefined
+    if (action === 'publish') {
+      nextStatus = 'published'
+      published_at = new Date().toISOString()
+    } else if (action === 'schedule') {
+      nextStatus = 'published'
+      const when = new Date(scheduleAt)
+      if (!scheduleAt || Number.isNaN(when.getTime())) {
+        throw new Error('Choose a time to schedule')
+      }
+      published_at = when.toISOString()
+    }
     return {
       title,
       slug,
       summary,
       body,
       type: 'blog',
-      status,
+      status: nextStatus,
+      published_at,
       video_url: videoUrl,
       cover_image_url: coverImageUrl,
       sort_order: Number(sortOrder),
@@ -79,15 +103,14 @@ export function PostEditor({ mode, postId }: EditorProps) {
     }
   }
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSave(action: 'draft' | 'publish' | 'schedule' | 'unpublish') {
     setSaving(true)
     setError('')
     try {
       const res = await fetch(mode === 'edit' ? `/api/posts/${postId}` : '/api/posts', {
         method: mode === 'edit' ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload()),
+        body: JSON.stringify(payload(action)),
       })
       const data = (await res.json()) as { post?: Post; error?: string }
       if (!res.ok || !data.post) throw new Error(data.error || 'Failed to save post')
@@ -129,7 +152,13 @@ export function PostEditor({ mode, postId }: EditorProps) {
       </div>
       {loading ? <p className="text-sm text-gray-500">Loading post…</p> : null}
       {!loading ? (
-        <form onSubmit={handleSave} className="space-y-4 max-w-3xl">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            void handleSave('draft')
+          }}
+          className="space-y-4 max-w-3xl"
+        >
           <div>
             <label htmlFor="post-title" className="block text-sm font-medium text-gray-700">
               Title
@@ -190,18 +219,20 @@ export function PostEditor({ mode, postId }: EditorProps) {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="post-status" className="block text-sm font-medium text-gray-700">
-                Status
+              <p className="text-sm font-medium text-gray-700">Status</p>
+              <p className="mt-1 text-sm text-gray-600">{status === 'published' ? 'published' : 'draft'}</p>
+            </div>
+            <div>
+              <label htmlFor="post-schedule" className="block text-sm font-medium text-gray-700">
+                Schedule
               </label>
-              <select
-                id="post-status"
-                value={status}
-                onChange={(e) => setStatus(e.target.value === 'published' ? 'published' : 'draft')}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="draft">draft</option>
-                <option value="published">published</option>
-              </select>
+              <Input
+                id="post-schedule"
+                type="datetime-local"
+                value={scheduleAt}
+                onChange={(e) => setScheduleAt(e.target.value)}
+                className="mt-1"
+              />
             </div>
             <div>
               <label htmlFor="post-sort" className="block text-sm font-medium text-gray-700">
@@ -231,10 +262,21 @@ export function PostEditor({ mode, postId }: EditorProps) {
             </div>
           </div>
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? 'Saving…' : 'Save draft'}
             </Button>
+            <Button type="button" disabled={saving} onClick={() => void handleSave('publish')}>
+              Publish now
+            </Button>
+            <Button type="button" variant="outline" disabled={saving} onClick={() => void handleSave('schedule')}>
+              Schedule
+            </Button>
+            {status === 'published' ? (
+              <Button type="button" variant="outline" disabled={saving} onClick={() => void handleSave('unpublish')}>
+                Unpublish
+              </Button>
+            ) : null}
             {mode === 'edit' ? (
               <Button type="button" variant="outline" disabled={saving} onClick={handleDelete}>
                 Delete

@@ -15,6 +15,9 @@ import {
   requirePostWebsite,
   SLUG_TAKEN_MESSAGE,
   slugifyTitle,
+  resolvePublication,
+  isLivePublication,
+  blogSlugsToRefresh,
 } from './posts.ts'
 import { articleJsonLd, publicSiteOrigin } from './blog-seo.ts'
 
@@ -144,6 +147,37 @@ describe('search escape', () => {
     assert.equal(pattern, '%\\%%')
     assert.notEqual(pattern, '%%')
     assert.equal(ilikeContainsPattern('100%_done'), '%100\\%\\_done%')
+  })
+})
+
+describe('publication', () => {
+  it('rejects a published post with no timestamp before any insert', () => {
+    assert.throws(
+      () => resolvePublication({ status: 'published', publishedAt: null }),
+      /A published post needs a valid published_at timestamp/
+    )
+    assert.equal(
+      httpStatusForPostError('A published post needs a valid published_at timestamp'),
+      400
+    )
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    assert.equal(isLivePublication('published', tomorrow), false)
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    assert.equal(isLivePublication('published', yesterday), true)
+    const kept = resolvePublication({
+      status: 'draft',
+      publishedAt: undefined,
+      existingPublishedAt: yesterday,
+    })
+    assert.equal(kept.status, 'draft')
+    assert.equal(kept.published_at, yesterday)
+    assert.deepEqual(
+      blogSlugsToRefresh(
+        { status: 'published', published_at: yesterday, slug: 'old' },
+        { status: 'published', published_at: yesterday, slug: 'new' }
+      ),
+      ['old', 'new']
+    )
   })
 })
 

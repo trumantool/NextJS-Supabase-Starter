@@ -1,14 +1,17 @@
+import { revalidatePath } from 'next/cache'
 import { createSSRClient } from '@/lib/supabase/server'
 import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
 import type { Post } from '@/lib/types'
 import {
   BLOG_TYPE,
   SLUG_TAKEN_MESSAGE,
+  blogSlugsToRefresh,
   ilikeContainsPattern,
   isBlogType,
   isHttpUrl,
   isPostSlug,
   requirePostWebsite,
+  resolvePublication,
   slugifyTitle,
   type PostWebsite,
 } from '@/lib/posts'
@@ -25,6 +28,7 @@ export type PostInput = {
   sort_order?: unknown
   categories?: unknown
   tags?: unknown
+  published_at?: unknown
 }
 
 const LIST_COLUMNS =
@@ -214,7 +218,9 @@ export async function createPost(input: PostInput): Promise<Post> {
     .select('*')
     .single()
   if (error) throwPostWriteError(error)
-  return data as Post
+  const saved = data as Post
+  refreshPublicBlog(blogSlugsToRefresh(null, saved))
+  return saved
 }
 
 export async function updatePost(id: string, input: PostInput): Promise<Post> {
@@ -234,12 +240,30 @@ export async function updatePost(id: string, input: PostInput): Promise<Post> {
     .select('*')
     .single()
   if (error) throwPostWriteError(error)
-  return data as Post
+  const saved = data as Post
+  const { error: revisionError } = await supabase.from('blog_revisions').insert({
+    post_id: saved.id,
+    editor_id: userId,
+    title: saved.title,
+    slug: saved.slug,
+    summary: saved.summary,
+    body: saved.body,
+    body_doc: null,
+  })
+  if (revisionError) throw new Error(revisionError.message)
+  refreshPublicBlog(
+    blogSlugsToRefresh(
+      { status: existing.status, published_at: existing.published_at, slug: existing.slug },
+      saved
+    )
+  )
+  return saved
 }
 
 export async function deletePost(id: string): Promise<void> {
   const website = currentWebsite()
   const userId = await requireUserId()
+  const existing = await getMyPost(id)
   const supabase = await createSSRClient()
   const { error } = await supabase
     .from('posts')
@@ -249,6 +273,20 @@ export async function deletePost(id: string): Promise<void> {
     .eq('website', website)
     .eq('type', BLOG_TYPE)
   if (error) throw new Error(error.message)
+  refreshPublicBlog(
+    blogSlugsToRefresh(
+      { status: existing.status, published_at: existing.published_at, slug: existing.slug },
+      null
+    )
+  )
+}
+
+function refreshPublicBlog(slugs: string[]) {
+  if (slugs.length === 0) return
+  revalidatePath('/posts')
+  revalidatePath('/posts/rss.xml')
+  revalidatePath('/sitemap.xml')
+  for (const slug of slugs) revalidatePath(`/posts/${slug}`)
 }
 
 async function normalizePost(input: PostInput, _website: PostWebsite, existing?: Post) {
@@ -281,10 +319,11 @@ async function normalizePost(input: PostInput, _website: PostWebsite, existing?:
     throw new Error('Status must be draft or published')
   }
 
-  let published_at = existing?.published_at ?? null
-  if (statusRaw === 'published' && !published_at) {
-    published_at = new Date().toISOString()
-  }
+  const publication = resolvePublication({
+    status: statusRaw,
+    publishedAt: input.published_at,
+    existingPublishedAt: existing?.published_at ?? null,
+  })
 
   const sortSource = input.sort_order ?? existing?.sort_order ?? 0
   const sort_order = typeof sortSource === 'number' ? sortSource : Number(sortSource)
@@ -297,8 +336,8 @@ async function normalizePost(input: PostInput, _website: PostWebsite, existing?:
     summary,
     body: bodySource ?? '',
     parent_id: null,
-    status: statusRaw,
-    published_at,
+    status: publication.status,
+    published_at: publication.published_at,
     video_url: optionalUrl(input.video_url ?? existing?.video_url ?? null, 'Video URL'),
     cover_image_url: optionalUrl(
       input.cover_image_url ?? existing?.cover_image_url ?? null,

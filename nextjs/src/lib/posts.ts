@@ -81,6 +81,64 @@ export function publicSlugConflictMessage(raw: string): string {
   return raw
 }
 
+export function isLivePublication(
+  status: string,
+  publishedAt: string | null,
+  now = Date.now()
+): boolean {
+  if (status !== 'published' || !publishedAt) return false
+  const time = new Date(publishedAt).getTime()
+  if (Number.isNaN(time)) return false
+  return time <= now
+}
+
+/**
+ * Draft keeps the existing timestamp. Published requires the caller to send a
+ * real timestamp so a database trigger cannot fill in now().
+ */
+export function resolvePublication(input: {
+  status: string
+  publishedAt: unknown
+  existingPublishedAt?: string | null
+}): { status: 'draft' | 'published'; published_at: string | null } {
+  if (input.status !== 'draft' && input.status !== 'published') {
+    throw new Error('Status must be draft or published')
+  }
+  if (input.status === 'draft') {
+    if (input.publishedAt === undefined) {
+      return { status: 'draft', published_at: input.existingPublishedAt ?? null }
+    }
+    if (input.publishedAt === null || input.publishedAt === '') {
+      return { status: 'draft', published_at: null }
+    }
+    const parsed = parseTimestamp(input.publishedAt)
+    if (!parsed) throw new Error('A published post needs a valid published_at timestamp')
+    return { status: 'draft', published_at: parsed }
+  }
+  const parsed = parseTimestamp(input.publishedAt)
+  if (!parsed) throw new Error('A published post needs a valid published_at timestamp')
+  return { status: 'published', published_at: parsed }
+}
+
+function parseTimestamp(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const time = new Date(value).getTime()
+  if (Number.isNaN(time)) return null
+  return new Date(time).toISOString()
+}
+
+export function blogSlugsToRefresh(
+  before: { status: string; published_at: string | null; slug: string } | null,
+  after: { status: string; published_at: string | null; slug: string } | null
+): string[] {
+  const slugs: string[] = []
+  if (before && isLivePublication(before.status, before.published_at)) slugs.push(before.slug)
+  if (after && isLivePublication(after.status, after.published_at) && !slugs.includes(after.slug)) {
+    slugs.push(after.slug)
+  }
+  return slugs
+}
+
 export function httpStatusForPostError(message: string): number {
   if (message === 'Unauthorized') return 401
   if (message === SLUG_TAKEN_MESSAGE) return 409

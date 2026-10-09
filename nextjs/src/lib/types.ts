@@ -912,6 +912,42 @@ export type Database = {
         }
         Relationships: []
       }
+      blog_revisions: {
+        Row: {
+          id: string
+          post_id: string
+          editor_id: string | null
+          title: string
+          slug: string
+          summary: string | null
+          body: string | null
+          body_doc: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          editor_id?: string | null
+          title: string
+          slug: string
+          summary?: string | null
+          body?: string | null
+          body_doc?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          editor_id?: string | null
+          title?: string
+          slug?: string
+          summary?: string | null
+          body?: string | null
+          body_doc?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       llm_models_picker: {
