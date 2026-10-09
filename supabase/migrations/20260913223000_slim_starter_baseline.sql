@@ -56,6 +56,11 @@ AS $$
   );
 $$;
 
+-- Called from authenticated RLS only. anon never receives EXECUTE.
+REVOKE EXECUTE ON FUNCTION authenticative.is_user_authenticated() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION authenticative.is_user_authenticated() TO authenticated;
+GRANT EXECUTE ON FUNCTION authenticative.is_user_authenticated() TO service_role;
+
 -- Body references public.user_data; plpgsql is parsed at call time so this
 -- can be created before the table exists.
 CREATE OR REPLACE FUNCTION authenticative.is_admin()
@@ -74,7 +79,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION authenticative.is_admin() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION authenticative.is_admin() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO service_role;
 
@@ -130,7 +135,7 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO service_role;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin;
 
@@ -458,7 +463,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.claim_queued_automation_runs(p_limit integer DEFAULT 5)
@@ -498,7 +503,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.claim_queued_automation_runs(integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.claim_queued_automation_runs(integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_queued_automation_runs(integer) TO service_role;
 
 -- ============================================================================

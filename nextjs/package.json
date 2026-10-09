@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --experimental-strip-types --test src/lib/social-profile.test.ts src/lib/openrouter-key.test.ts src/lib/posts.test.ts src/lib/stripe-billing.test.ts src/lib/ledger-sql.test.ts"
+    "test": "node --experimental-strip-types --test src/lib/social-profile.test.ts src/lib/openrouter-key.test.ts src/lib/posts.test.ts src/lib/stripe-billing.test.ts src/lib/ledger-sql.test.ts src/lib/security-definer-rls.test.ts"
   },
   "dependencies": {
     "@next/third-parties": "^15.1.5",

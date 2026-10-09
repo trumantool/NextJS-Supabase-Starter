@@ -439,9 +439,9 @@ COMMENT ON FUNCTION public.record_llm_turn_usage(
 ) IS
   'Record one LLM turn. 10 arguments. No course_post_id. Always bumps user_data totals. Updates llm_models and inserts llm_turn_rates only when the model id is already in the catalog.';
 
-REVOKE ALL ON FUNCTION public.record_llm_turn_usage(
+REVOKE EXECUTE ON FUNCTION public.record_llm_turn_usage(
   uuid, text, bigint, bigint, uuid, uuid, numeric, numeric, numeric, text
-) FROM PUBLIC, anon;
+) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.record_llm_turn_usage(
   uuid, text, bigint, bigint, uuid, uuid, numeric, numeric, numeric, text
@@ -736,6 +736,6 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO service_role;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin;
