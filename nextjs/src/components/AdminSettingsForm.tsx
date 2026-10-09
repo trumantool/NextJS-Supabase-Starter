@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Loader2, Save, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { Tables } from '@/lib/types'
 
-type AdminSetting = Tables<'admin_settings'>
+type AdminSetting = Tables<'admin_settings'> & { secret_is_set?: boolean }
 
 export function AdminSettingsForm() {
   const [settings, setSettings] = useState<AdminSetting[] | null>(null)
@@ -40,7 +40,13 @@ export function AdminSettingsForm() {
     )
   }
 
-  const handleSave = async (setting: AdminSetting) => {
+  const applySaved = (setting: AdminSetting) => {
+    setSettings((prev) =>
+      prev ? prev.map((s) => (s.id === setting.id ? { ...s, ...setting } : s)) : prev
+    )
+  }
+
+  const postSetting = async (setting: AdminSetting, extra?: { clearSecret?: boolean }) => {
     setSavingId(setting.id)
     setSavedId(null)
     setError(null)
@@ -48,16 +54,26 @@ export function AdminSettingsForm() {
       const res = await fetch('/api/admin/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: setting.id, value: setting.option_value }),
+        body: JSON.stringify({
+          id: setting.id,
+          value: extra?.clearSecret ? '' : setting.option_value,
+          clearSecret: extra?.clearSecret === true,
+        }),
       })
       const data = await res.json()
       if (!res.ok || !data?.success) throw new Error(data?.error || 'Failed to save setting')
+      if (data.setting) applySaved(data.setting as AdminSetting)
       setSavedId(setting.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save setting')
     } finally {
       setSavingId(null)
     }
+  }
+
+  const handleSave = async (setting: AdminSetting) => {
+    if (setting.option_field_type === 'secret' && !setting.option_value.trim()) return
+    await postSetting(setting)
   }
 
   if (loading) {
@@ -94,13 +110,46 @@ export function AdminSettingsForm() {
           </CardHeader>
           <CardContent>
             <div className="flex items-start gap-3">
-              <div className="flex-1">
+              <div className="flex-1 space-y-2">
                 {setting.option_field_type === 'textarea' ? (
                   <Textarea
                     value={setting.option_value}
                     onChange={(e) => handleValueChange(setting.id, e.target.value)}
                     rows={4}
                   />
+                ) : setting.option_field_type === 'boolean' ? (
+                  <select
+                    value={setting.option_value === 'true' ? 'true' : 'false'}
+                    onChange={(e) => handleValueChange(setting.id, e.target.value)}
+                    className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="false">false</option>
+                    <option value="true">true</option>
+                  </select>
+                ) : setting.option_field_type === 'secret' ? (
+                  <>
+                    <Input
+                      type="password"
+                      autoComplete="new-password"
+                      value={setting.option_value}
+                      placeholder={
+                        setting.secret_is_set
+                          ? 'A value is saved. Enter a new one to replace it.'
+                          : 'No value saved'
+                      }
+                      onChange={(e) => handleValueChange(setting.id, e.target.value)}
+                    />
+                    {setting.secret_is_set ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={savingId === setting.id}
+                        onClick={() => postSetting(setting, { clearSecret: true })}
+                      >
+                        Clear saved value
+                      </Button>
+                    ) : null}
+                  </>
                 ) : (
                   <Input
                     type={setting.option_field_type === 'email' ? 'email' : 'text'}
@@ -122,7 +171,10 @@ export function AdminSettingsForm() {
               <Button
                 type="button"
                 onClick={() => handleSave(setting)}
-                disabled={savingId === setting.id}
+                disabled={
+                  savingId === setting.id ||
+                  (setting.option_field_type === 'secret' && !setting.option_value.trim())
+                }
               >
                 {savingId === setting.id ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

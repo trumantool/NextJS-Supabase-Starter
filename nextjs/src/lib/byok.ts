@@ -109,17 +109,4 @@ export async function clearByokKeyForCurrentUser(): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
-/** Prefer the user's BYOK key; fall back to the platform OPENROUTER_API_KEY. */
-export async function resolveOpenRouterKey(userId?: string): Promise<string> {
-  if (userId) {
-    const admin = await createServerAdminClient()
-    const { data } = await admin
-      .from('user_settings')
-      .select('openrouter_api_key')
-      .eq('user_id', userId)
-      .maybeSingle()
-    const byok = data?.openrouter_api_key?.trim()
-    if (byok) return byok
-  }
-  return process.env.OPENROUTER_API_KEY?.trim() || ''
-}
+export { resolveOpenRouterKey } from '@/lib/openrouter-key'

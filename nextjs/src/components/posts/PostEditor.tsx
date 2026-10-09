@@ -1,0 +1,376 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { DocumentEditor } from '@/app/(dashboard)/documents/components/DocumentEditor'
+import { AiPanel } from '@/app/(dashboard)/documents/components/AiPanel'
+import type { TipTapDoc } from '@/app/(dashboard)/documents/lib/types'
+import { docFromBody, isTipTapDoc } from '@/lib/blog-doc'
+import type { Post } from '@/lib/types'
+
+const BLOG_PRESETS = ['Draft an introduction', 'Shorten this', 'Add a heading']
+
+type EditorProps = { mode: 'new' | 'edit'; postId?: string }
+
+function toLocalInput(iso: string | null): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+export function PostEditor({ mode, postId }: EditorProps) {
+  const router = useRouter()
+  const [loading, setLoading] = useState(mode === 'edit')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [title, setTitle] = useState('')
+  const [slug, setSlug] = useState('')
+  const [summary, setSummary] = useState('')
+  const [doc, setDoc] = useState<TipTapDoc>(() => docFromBody(''))
+  const [aiOpen, setAiOpen] = useState(false)
+  const [status, setStatus] = useState<'draft' | 'published'>('draft')
+  const [videoUrl, setVideoUrl] = useState('')
+  const [coverImageUrl, setCoverImageUrl] = useState('')
+  const [sortOrder, setSortOrder] = useState('0')
+  const [categories, setCategories] = useState('')
+  const [tags, setTags] = useState('')
+  const [scheduleAt, setScheduleAt] = useState('')
+
+  useEffect(() => {
+    if (mode !== 'edit' || !postId) return
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch(`/api/posts/${postId}`)
+        const data = (await res.json()) as {
+          post?: Post
+          categories?: string[]
+          tags?: string[]
+          error?: string
+        }
+        if (!res.ok || !data.post) throw new Error(data.error || 'Failed to load post')
+        if (cancelled) return
+        const post = data.post
+        setTitle(post.title)
+        setSlug(post.slug)
+        setSummary(post.summary ?? '')
+        setDoc(isTipTapDoc(post.body_doc) ? post.body_doc : docFromBody(post.body))
+        setStatus(post.status === 'published' ? 'published' : 'draft')
+        setVideoUrl(post.video_url ?? '')
+        setCoverImageUrl(post.cover_image_url ?? '')
+        setSortOrder(String(post.sort_order ?? 0))
+        setCategories((data.categories ?? []).join(', '))
+        setTags((data.tags ?? []).join(', '))
+        setScheduleAt(toLocalInput(post.published_at))
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load post')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [mode, postId])
+
+  function payload(action: 'draft' | 'publish' | 'schedule' | 'unpublish') {
+    let nextStatus: 'draft' | 'published' = 'draft'
+    let published_at: string | undefined
+    if (action === 'publish') {
+      nextStatus = 'published'
+      published_at = new Date().toISOString()
+    } else if (action === 'schedule') {
+      nextStatus = 'published'
+      const when = new Date(scheduleAt)
+      if (!scheduleAt || Number.isNaN(when.getTime())) {
+        throw new Error('Choose a time to schedule')
+      }
+      published_at = when.toISOString()
+    }
+    return {
+      title,
+      slug,
+      summary,
+      body_doc: doc,
+      type: 'blog',
+      status: nextStatus,
+      published_at,
+      video_url: videoUrl,
+      cover_image_url: coverImageUrl,
+      sort_order: Number(sortOrder),
+      categories,
+      tags,
+    }
+  }
+
+  async function handleSave(action: 'draft' | 'publish' | 'schedule' | 'unpublish') {
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch(mode === 'edit' ? `/api/posts/${postId}` : '/api/posts', {
+        method: mode === 'edit' ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload(action)),
+      })
+      const data = (await res.json()) as { post?: Post; error?: string }
+      if (!res.ok || !data.post) throw new Error(data.error || 'Failed to save post')
+      router.push('/my-posts')
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save post')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function applyAi(text: string) {
+    const lines = text.split('\n').filter((line) => line.trim())
+    const content = lines.map((line) => ({
+      type: 'paragraph',
+      content: [{ type: 'text', text: line }],
+    }))
+    setDoc((prev) => ({ type: 'doc', content: [...prev.content, ...content] }))
+  }
+
+  function requestImageUrl(): Promise<string | null> {
+    return new Promise((resolve) => {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/jpeg,image/png,image/webp,image/gif'
+      input.onchange = () => {
+        const file = input.files?.[0]
+        if (!file) {
+          resolve(null)
+          return
+        }
+        const form = new FormData()
+        form.set('file', file)
+        void fetch('/api/posts/media', { method: 'POST', body: form })
+          .then(async (res) => {
+            const data = (await res.json()) as { url?: string; error?: string }
+            if (!res.ok || !data.url) {
+              setError(data.error || 'Failed to upload image')
+              resolve(null)
+              return
+            }
+            resolve(data.url)
+          })
+          .catch(() => resolve(null))
+      }
+      input.click()
+    })
+  }
+
+  async function uploadCover(file: File) {
+    setSaving(true)
+    setError('')
+    try {
+      const form = new FormData()
+      form.set('file', file)
+      const res = await fetch('/api/posts/media', { method: 'POST', body: form })
+      const data = (await res.json()) as { url?: string; error?: string }
+      if (!res.ok || !data.url) throw new Error(data.error || 'Failed to upload image')
+      setCoverImageUrl(data.url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload image')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!postId) return
+    if (!window.confirm('Delete this post?')) return
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' })
+      const data = (await res.json()) as { error?: string }
+      if (!res.ok) throw new Error(data.error || 'Failed to delete post')
+      router.push('/my-posts')
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete post')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold tracking-tight">
+          {mode === 'edit' ? 'Edit post' : 'New post'}
+        </h1>
+        <Link href="/my-posts" className="text-sm text-gray-600 hover:underline">
+          Back to posts
+        </Link>
+      </div>
+      {loading ? <p className="text-sm text-gray-500">Loading post…</p> : null}
+      {!loading ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            void handleSave('draft')
+          }}
+          className="space-y-4 max-w-3xl"
+        >
+          <div>
+            <label htmlFor="post-title" className="block text-sm font-medium text-gray-700">
+              Title
+            </label>
+            <Input id="post-title" value={title} onChange={(e) => setTitle(e.target.value)} required className="mt-1" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="post-slug" className="block text-sm font-medium text-gray-700">
+                Slug
+              </label>
+              <Input
+                id="post-slug"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                placeholder="Generated from the title if empty"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="post-summary" className="block text-sm font-medium text-gray-700">
+              Summary
+            </label>
+            <Textarea id="post-summary" value={summary} onChange={(e) => setSummary(e.target.value)} rows={2} className="mt-1" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="post-categories" className="block text-sm font-medium text-gray-700">
+                Categories
+              </label>
+              <Input
+                id="post-categories"
+                value={categories}
+                onChange={(e) => setCategories(e.target.value)}
+                placeholder="Comma-separated"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label htmlFor="post-tags" className="block text-sm font-medium text-gray-700">
+                Tags
+              </label>
+              <Input
+                id="post-tags"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="Comma-separated"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <div className="h-[640px] overflow-hidden rounded-md border bg-white">
+            <div className="flex h-full">
+              <div className="min-w-0 flex-1">
+                <DocumentEditor
+                  initialDoc={doc}
+                  onDocChange={setDoc}
+                  onOpenAi={() => setAiOpen(true)}
+                  onRequestImageUrl={requestImageUrl}
+                />
+              </div>
+              <AiPanel
+                open={aiOpen}
+                onClose={() => setAiOpen(false)}
+                doc={doc}
+                onApply={applyAi}
+                presets={BLOG_PRESETS}
+                purpose="blog"
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Status</p>
+              <p className="mt-1 text-sm text-gray-600">{status === 'published' ? 'published' : 'draft'}</p>
+            </div>
+            <div>
+              <label htmlFor="post-schedule" className="block text-sm font-medium text-gray-700">
+                Schedule
+              </label>
+              <Input
+                id="post-schedule"
+                type="datetime-local"
+                value={scheduleAt}
+                onChange={(e) => setScheduleAt(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label htmlFor="post-sort" className="block text-sm font-medium text-gray-700">
+                Sort order
+              </label>
+              <Input
+                id="post-sort"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                inputMode="numeric"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="post-cover" className="block text-sm font-medium text-gray-700">
+                Cover image URL
+              </label>
+              <Input id="post-cover" value={coverImageUrl} onChange={(e) => setCoverImageUrl(e.target.value)} className="mt-1" />
+              <input
+                id="post-cover-file"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="mt-2 block text-sm"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) void uploadCover(file)
+                }}
+              />
+            </div>
+            <div>
+              <label htmlFor="post-video" className="block text-sm font-medium text-gray-700">
+                Video URL
+              </label>
+              <Input id="post-video" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          <div className="flex flex-wrap gap-3">
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving…' : 'Save draft'}
+            </Button>
+            <Button type="button" disabled={saving} onClick={() => void handleSave('publish')}>
+              Publish now
+            </Button>
+            <Button type="button" variant="outline" disabled={saving} onClick={() => void handleSave('schedule')}>
+              Schedule
+            </Button>
+            {status === 'published' ? (
+              <Button type="button" variant="outline" disabled={saving} onClick={() => void handleSave('unpublish')}>
+                Unpublish
+              </Button>
+            ) : null}
+            {mode === 'edit' ? (
+              <Button type="button" variant="outline" disabled={saving} onClick={handleDelete}>
+                Delete
+              </Button>
+            ) : null}
+          </div>
+        </form>
+      ) : null}
+    </div>
+  )
+}

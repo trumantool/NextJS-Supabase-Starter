@@ -188,6 +188,8 @@ export type Database = {
           output: string | null
           started_at: string | null
           finished_at: string | null
+          input_tokens: number | null
+          output_tokens: number | null
           created_at: string
         }
         Insert: {
@@ -200,6 +202,8 @@ export type Database = {
           output?: string | null
           started_at?: string | null
           finished_at?: string | null
+          input_tokens?: number | null
+          output_tokens?: number | null
           created_at?: string
         }
         Update: {
@@ -212,6 +216,8 @@ export type Database = {
           output?: string | null
           started_at?: string | null
           finished_at?: string | null
+          input_tokens?: number | null
+          output_tokens?: number | null
           created_at?: string
         }
         Relationships: []
@@ -369,6 +375,8 @@ export type Database = {
           chat_id: string
           role: string
           content: Json
+          input_tokens: number | null
+          output_tokens: number | null
           created_at: string
         }
         Insert: {
@@ -376,6 +384,8 @@ export type Database = {
           chat_id: string
           role: string
           content?: Json
+          input_tokens?: number | null
+          output_tokens?: number | null
           created_at?: string
         }
         Update: {
@@ -383,6 +393,8 @@ export type Database = {
           chat_id?: string
           role?: string
           content?: Json
+          input_tokens?: number | null
+          output_tokens?: number | null
           created_at?: string
         }
         Relationships: []
@@ -505,6 +517,14 @@ export type Database = {
           instagram_url: string | null
           youtube_url: string | null
           website_url: string | null
+          plan: string
+          plan_status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          current_period_end: string | null
+          total_input_tokens: number
+          total_output_tokens: number
+          total_tokens: number
           created_at: string
           updated_at: string
         }
@@ -520,6 +540,14 @@ export type Database = {
           instagram_url?: string | null
           youtube_url?: string | null
           website_url?: string | null
+          plan?: string
+          plan_status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          current_period_end?: string | null
+          total_input_tokens?: number
+          total_output_tokens?: number
+          total_tokens?: number
           created_at?: string
           updated_at?: string
         }
@@ -535,6 +563,14 @@ export type Database = {
           instagram_url?: string | null
           youtube_url?: string | null
           website_url?: string | null
+          plan?: string
+          plan_status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          current_period_end?: string | null
+          total_input_tokens?: number
+          total_output_tokens?: number
+          total_tokens?: number
           created_at?: string
           updated_at?: string
         }
@@ -630,9 +666,389 @@ export type Database = {
         }
         Relationships: []
       }
+      llm_models: {
+        Row: {
+          id: string
+          display_name: string
+          provider: string | null
+          prompt_price: number | null
+          completion_price: number | null
+          total_input_tokens: number
+          total_output_tokens: number
+          total_tokens: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          display_name: string
+          provider?: string | null
+          prompt_price?: number | null
+          completion_price?: number | null
+          total_input_tokens?: number
+          total_output_tokens?: number
+          total_tokens?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          display_name?: string
+          provider?: string | null
+          prompt_price?: number | null
+          completion_price?: number | null
+          total_input_tokens?: number
+          total_output_tokens?: number
+          total_tokens?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      llm_turn_rates: {
+        Row: {
+          id: string
+          user_id: string
+          model_id: string
+          message_id: string | null
+          automation_run_id: string | null
+          input_tokens: number
+          output_tokens: number
+          prompt_price: number | null
+          completion_price: number | null
+          markup: number
+          provider: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          model_id: string
+          message_id?: string | null
+          automation_run_id?: string | null
+          input_tokens?: number
+          output_tokens?: number
+          prompt_price?: number | null
+          completion_price?: number | null
+          markup?: number
+          provider?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          model_id?: string
+          message_id?: string | null
+          automation_run_id?: string | null
+          input_tokens?: number
+          output_tokens?: number
+          prompt_price?: number | null
+          completion_price?: number | null
+          markup?: number
+          provider?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      posts: {
+        Row: {
+          id: string
+          website: string
+          type: string
+          parent_id: string | null
+          title: string
+          slug: string
+          summary: string | null
+          body: string | null
+          body_doc: Json | null
+          video_url: string | null
+          cover_image_url: string | null
+          sort_order: number | null
+          status: string
+          published_at: string | null
+          author_id: string | null
+          origin: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          type: string
+          parent_id?: string | null
+          title: string
+          slug: string
+          summary?: string | null
+          body?: string | null
+          body_doc?: Json | null
+          video_url?: string | null
+          cover_image_url?: string | null
+          sort_order?: number | null
+          status?: string
+          published_at?: string | null
+          author_id?: string | null
+          origin?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          type?: string
+          parent_id?: string | null
+          title?: string
+          slug?: string
+          summary?: string | null
+          body?: string | null
+          body_doc?: Json | null
+          video_url?: string | null
+          cover_image_url?: string | null
+          sort_order?: number | null
+          status?: string
+          published_at?: string | null
+          author_id?: string | null
+          origin?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      blog_categories: {
+        Row: {
+          id: string
+          website: string
+          slug: string
+          name: string
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          slug: string
+          name: string
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          slug?: string
+          name?: string
+          description?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      blog_tags: {
+        Row: {
+          id: string
+          website: string
+          slug: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          slug: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          slug?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      post_categories: {
+        Row: { post_id: string; category_id: string }
+        Insert: { post_id: string; category_id: string }
+        Update: { post_id?: string; category_id?: string }
+        Relationships: []
+      }
+      post_tags: {
+        Row: { post_id: string; tag_id: string }
+        Insert: { post_id: string; tag_id: string }
+        Update: { post_id?: string; tag_id?: string }
+        Relationships: []
+      }
+      blog_author_profiles: {
+        Row: {
+          id: string
+          website: string
+          user_id: string
+          slug: string
+          display_name: string
+          bio: string | null
+          avatar_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          user_id: string
+          slug: string
+          display_name: string
+          bio?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          user_id?: string
+          slug?: string
+          display_name?: string
+          bio?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      blog_revisions: {
+        Row: {
+          id: string
+          post_id: string
+          editor_id: string | null
+          title: string
+          slug: string
+          summary: string | null
+          body: string | null
+          body_doc: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          editor_id?: string | null
+          title: string
+          slug: string
+          summary?: string | null
+          body?: string | null
+          body_doc?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          editor_id?: string | null
+          title?: string
+          slug?: string
+          summary?: string | null
+          body?: string | null
+          body_doc?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      blog_media: {
+        Row: {
+          id: string
+          website: string
+          owner_id: string
+          post_id: string | null
+          path: string
+          public_url: string
+          mime: string
+          byte_size: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          owner_id: string
+          post_id?: string | null
+          path: string
+          public_url: string
+          mime: string
+          byte_size: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          owner_id?: string
+          post_id?: string | null
+          path?: string
+          public_url?: string
+          mime?: string
+          byte_size?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      blog_comments: {
+        Row: {
+          id: string
+          post_id: string
+          user_id: string
+          body: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          user_id: string
+          body: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          user_id?: string
+          body?: string
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      newsletter_subscribers: {
+        Row: {
+          id: string
+          website: string
+          email: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          website: string
+          email: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          website?: string
+          email?: string
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      llm_models_picker: {
+        Row: {
+          id: string
+          display_name: string
+          provider: string | null
+          is_active: boolean
+        }
+        Relationships: []
+      }
     }
     Functions: {
       enqueue_automation_run: {
@@ -643,6 +1059,21 @@ export type Database = {
           p_new_status: string
         }
         Returns: string
+      }
+      record_llm_turn_usage: {
+        Args: {
+          p_user_id: string
+          p_model_id: string
+          p_input_tokens: number
+          p_output_tokens: number
+          p_message_id: string | null
+          p_automation_run_id: string | null
+          p_prompt_price: number | null
+          p_completion_price: number | null
+          p_markup: number | null
+          p_provider: string | null
+        }
+        Returns: undefined
       }
       claim_queued_automation_runs: {
         Args: { p_limit?: number }
@@ -803,4 +1234,5 @@ export type AgentTemplate = Database['public']['Tables']['agent_templates']['Row
 export type UserAgent = Database['public']['Tables']['user_agents']['Row']
 export type Chat = Database['public']['Tables']['chats']['Row']
 export type Message = Database['public']['Tables']['messages']['Row']
+export type Post = Database['public']['Tables']['posts']['Row']
 export type SessionTag = Database['public']['Tables']['session_tags']['Row']

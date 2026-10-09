@@ -11,9 +11,10 @@ import { EditorContextMenu } from './EditorContextMenu'
 interface Props {
   initialDoc: TipTapDoc
   onDocChange: (doc: TipTapDoc) => void
-  onExport: () => void
+  onExport?: () => void
   onOpenAi: () => void
   exporting?: boolean
+  onRequestImageUrl?: () => Promise<string | null>
 }
 
 function countsFromDoc(doc: TipTapDoc) {
@@ -45,6 +46,7 @@ export function DocumentEditor({
   onExport,
   onOpenAi,
   exporting,
+  onRequestImageUrl,
 }: Props) {
   const onDocChangeRef = useRef(onDocChange)
   onDocChangeRef.current = onDocChange
@@ -83,6 +85,7 @@ export function DocumentEditor({
         onExport={onExport}
         onOpenAi={onOpenAi}
         exporting={exporting}
+        onRequestImageUrl={onRequestImageUrl}
       />
       <div className="flex-1 overflow-auto bg-gray-100 p-4 sm:p-8">
         <div className="mx-auto max-w-[8.5in] bg-white shadow-lg rounded-sm min-h-[11in]">

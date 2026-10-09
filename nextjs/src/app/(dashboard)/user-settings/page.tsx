@@ -8,6 +8,8 @@ import { Key, User, CheckCircle } from 'lucide-react';
 import { MFASetup } from '@/components/MFASetup';
 import { ByokSettingsCard } from '@/components/ByokSettingsCard';
 import { SocialProfileSettingsCard } from '@/components/SocialProfileSettingsCard';
+import { ProfileNamesCard } from '@/components/ProfileNamesCard';
+import { BillingCard } from '@/components/BillingCard';
 
 export default function UserSettingsPage() {
     const { user } = useGlobal();
@@ -101,6 +103,10 @@ export default function UserSettingsPage() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    <ProfileNamesCard />
+
+                    <BillingCard />
 
                     <SocialProfileSettingsCard />
 
