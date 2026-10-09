@@ -155,8 +155,18 @@ export function AdminSettingsForm() {
                     type={setting.option_field_type === 'email' ? 'email' : 'text'}
                     value={setting.option_value}
                     onChange={(e) => handleValueChange(setting.id, e.target.value)}
+                    placeholder={
+                      setting.option_name === 'login_redirect_url'
+                        ? 'https://example.com'
+                        : undefined
+                    }
                   />
                 )}
+                {setting.option_name === 'login_redirect_url' ? (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Post-login and auth redirect base. No trailing slash.
+                  </p>
+                ) : null}
               </div>
               <Button
                 type="button"
