@@ -114,6 +114,7 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | No | Marks Checkout as configured. Hosted Checkout does not load Stripe.js |
 | `NEXT_PUBLIC_PRODUCTNAME` | Yes | Title, header, footer, homepage |
 | `POSTS_WEBSITE` | Yes for posts | Site written to and filtered on `public.posts.website`. Allowed: `edu`, `marketing-agent`, `afterallcare`. No default |
+| `ADMIN_SETTINGS_APP_KEY` | No | Which `admin_settings` rows this deployment reads and writes. Unset uses `app_key` NULL (the seeded single-app rows). Set a unique value on a shared database. Server-only |
 | `CRON_SECRET` | Yes for cron | Bearer secret for `/api/cron/automations` and `/api/workers/automations` |
 | `NEXT_PUBLIC_THEME` | No | Body theme class (default `theme-sass3`) |
 | `NEXT_PUBLIC_GOOGLE_TAG` | No | Google Analytics |
@@ -121,6 +122,30 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 | `NEXT_PUBLIC_TIERS_*` / `NEXT_PUBLIC_POPULAR_TIER` / `NEXT_PUBLIC_COMMON_FEATURES` | No | Homepage pricing demo |
 
 `NODE_ENV` is set by Next.js. Do not set `OPENROUTER_API_KEY_REACHTHEMAI`. Do not add Composio or Treg keys.
+
+### Admin settings on a shared database
+
+`public.admin_settings` can hold more than one app. `app_key` is NULL on every seeded row. Leave `ADMIN_SETTINGS_APP_KEY` unset and this deployment keeps reading and writing those rows. Site title, contact info, privacy, terms, and the other non-secret settings stay on the public pages. `secret` and `password` values are not selectable with the anon or authenticated key. The admin UI receives a blank field plus a flag that says whether a value is saved. An empty save keeps the stored value. **Clear saved value** stores an empty string. OpenRouter key resolution reads the row on the server with the service role.
+
+A clone that shares the database with other apps sets `ADMIN_SETTINGS_APP_KEY` to a unique slug, applies the latest migration (or pastes `supabase/schema.sql` on a new project), and copies its own rows. Until those rows exist, this deployment sees no admin settings and public pages use their code defaults.
+
+```sql
+INSERT INTO public.admin_settings (
+  app_key, option_name, option_value, option_field_type, option_title, option_description
+)
+SELECT
+  'your-app-key',
+  option_name,
+  CASE WHEN option_field_type IN ('secret', 'password') THEN '' ELSE option_value END,
+  option_field_type,
+  option_title,
+  option_description
+FROM public.admin_settings
+WHERE app_key IS NULL
+ON CONFLICT (app_key, option_name) DO NOTHING;
+```
+
+Use the same slug in `ADMIN_SETTINGS_APP_KEY`. Do not prefix it with `NEXT_PUBLIC_`. The variable is listed in [`nextjs/.env.template`](./nextjs/.env.template) and [`nextjs/.env.example`](./nextjs/.env.example).
 
 ## Deploy (later — not provisioned by this repo)
 

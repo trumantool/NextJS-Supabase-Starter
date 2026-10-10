@@ -30,9 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (commit .env.template only)
+# env files (commit .env.template and .env.example only)
 .env*
 !.env.template
+!.env.example
 
 # vercel
 .vercel
