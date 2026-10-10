@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Loader2, Save, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { Tables } from '@/lib/types'
+import { isConcealedAdminField } from '@/lib/admin-settings-scope'
 
 type AdminSetting = Tables<'admin_settings'> & { secret_is_set?: boolean }
 
@@ -72,7 +73,7 @@ export function AdminSettingsForm() {
   }
 
   const handleSave = async (setting: AdminSetting) => {
-    if (setting.option_field_type === 'secret' && !setting.option_value.trim()) return
+    if (isConcealedAdminField(setting.option_field_type) && !setting.option_value.trim()) return
     await postSetting(setting)
   }
 
@@ -126,7 +127,7 @@ export function AdminSettingsForm() {
                     <option value="false">false</option>
                     <option value="true">true</option>
                   </select>
-                ) : setting.option_field_type === 'secret' ? (
+                ) : isConcealedAdminField(setting.option_field_type) ? (
                   <>
                     <Input
                       type="password"
@@ -163,7 +164,7 @@ export function AdminSettingsForm() {
                 onClick={() => handleSave(setting)}
                 disabled={
                   savingId === setting.id ||
-                  (setting.option_field_type === 'secret' && !setting.option_value.trim())
+                  (isConcealedAdminField(setting.option_field_type) && !setting.option_value.trim())
                 }
               >
                 {savingId === setting.id ? (

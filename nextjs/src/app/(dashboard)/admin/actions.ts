@@ -3,20 +3,24 @@
 import { createSSRClient } from '@/lib/supabase/server'
 import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
 import { Tables } from '@/lib/types'
+import {
+  filterByAdminSettingsAppKey,
+  isConcealedAdminField,
+  presentAdminSettingForBrowser,
+  resolveAdminSettingWrite,
+} from '@/lib/admin-settings-scope'
+import {
+  configuredAdminSettingsAppKey,
+  dropConcealedAdminSettings,
+  requireCurrentUserAdmin,
+} from '@/lib/admin-settings-server'
 
 type AdminSetting = Tables<'admin_settings'>
 
 export type AdminSettingView = AdminSetting & { secret_is_set: boolean }
 
 function presentAdminSetting(row: AdminSetting): AdminSettingView {
-  if (row.option_field_type === 'secret') {
-    return {
-      ...row,
-      option_value: '',
-      secret_is_set: row.option_value.trim().length > 0,
-    }
-  }
-  return { ...row, secret_is_set: false }
+  return presentAdminSettingForBrowser(row)
 }
 
 /**
@@ -43,47 +47,41 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
  * Fetches all admin settings. Only accessible to admin users.
  */
 export async function getAdminSettings(): Promise<AdminSettingView[]> {
-  const supabase = await createSSRClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
+  await requireCurrentUserAdmin()
 
-  const { data: userData } = await supabase
-    .from('user_data')
-    .select('user_role')
-    .eq('user_id', user.id)
-    .maybeSingle()
-  if (userData?.user_role !== 'admin') {
-    throw new Error('Forbidden: admin access required')
-  }
-
-  // Service role sees secret rows. They are masked before leaving the server.
+  // Service role sees secret and password rows. Values are blanked before the browser.
   const admin = await createServerAdminClient()
-  const { data, error } = await admin
-    .from('admin_settings')
-    .select('*')
-    .order('created_at', { ascending: true })
+  const scoped = filterByAdminSettingsAppKey(
+    admin.from('admin_settings').select('*').order('created_at', { ascending: true }),
+    configuredAdminSettingsAppKey()
+  )
+  const { data, error } = await scoped
 
   if (error) throw new Error(error.message)
   return ((data ?? []) as AdminSetting[]).map(presentAdminSetting)
 }
 
 /**
- * Fetches admin settings by option name. Publicly readable (RLS allows anon
- * and authenticated SELECT). Returns a map of option_name -> option_value.
- * Missing options are simply absent from the map so callers can fall back to
- * defaults.
+ * Fetches non-secret admin settings by option name for this deployment.
+ * RLS allows anon and authenticated SELECT of rows whose option_field_type
+ * is not secret or password. Concealed names are dropped. Missing options
+ * are absent from the map so callers can fall back to defaults.
  */
 export async function getAdminSettingsByNames(
   names: string[]
 ): Promise<Record<string, string>> {
   const supabase = await createSSRClient()
+  const scoped = filterByAdminSettingsAppKey(
+    supabase
+      .from('admin_settings')
+      .select('option_name, option_value, option_field_type')
+      .in('option_name', names)
+      .neq('option_field_type', 'secret')
+      .neq('option_field_type', 'password'),
+    configuredAdminSettingsAppKey()
+  )
 
-  const { data, error } = await supabase
-    .from('admin_settings')
-    .select('option_name, option_value')
-    .in('option_name', names)
+  const { data, error } = await scoped
 
   if (error) {
     console.error('Failed to fetch admin settings:', error)
@@ -91,7 +89,7 @@ export async function getAdminSettingsByNames(
   }
 
   const result: Record<string, string> = {}
-  for (const row of data ?? []) {
+  for (const row of dropConcealedAdminSettings(data ?? [])) {
     result[row.option_name] = row.option_value
   }
   return result
@@ -105,49 +103,35 @@ export async function updateAdminSetting(
   optionValue: string,
   options?: { clearSecret?: boolean }
 ): Promise<AdminSettingView> {
-  const supabase = await createSSRClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
-
-  const { data: userData } = await supabase
-    .from('user_data')
-    .select('user_role')
-    .eq('user_id', user.id)
-    .maybeSingle()
-  if (userData?.user_role !== 'admin') {
-    throw new Error('Forbidden: admin access required')
-  }
+  await requireCurrentUserAdmin()
 
   const admin = await createServerAdminClient()
-  const { data: existing, error: readError } = await admin
-    .from('admin_settings')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle()
+  const appKey = configuredAdminSettingsAppKey()
+  const existingQuery = filterByAdminSettingsAppKey(
+    admin.from('admin_settings').select('*').eq('id', id),
+    appKey
+  )
+  const { data: existing, error: readError } = await existingQuery.maybeSingle()
   if (readError) throw new Error(readError.message)
   if (!existing) throw new Error('Setting not found')
 
   const row = existing as AdminSetting
-  let nextValue = optionValue
-  if (row.option_field_type === 'secret') {
-    if (options?.clearSecret) {
-      nextValue = ''
-    } else if (!optionValue.trim()) {
-      return presentAdminSetting(row)
-    } else {
-      nextValue = optionValue.trim()
-    }
-  }
+  const write = resolveAdminSettingWrite(
+    row.option_field_type,
+    row.option_value,
+    optionValue,
+    options?.clearSecret === true && isConcealedAdminField(row.option_field_type)
+  )
+  if (write.keepExisting) return presentAdminSetting(row)
 
-  const writer = row.option_field_type === 'secret' ? admin : supabase
-  const { data, error } = await writer
-    .from('admin_settings')
-    .update({ option_value: nextValue, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single()
+  const updateQuery = filterByAdminSettingsAppKey(
+    admin
+      .from('admin_settings')
+      .update({ option_value: write.optionValue, updated_at: new Date().toISOString() })
+      .eq('id', id),
+    appKey
+  )
+  const { data, error } = await updateQuery.select().single()
 
   if (error) throw new Error(error.message)
   return presentAdminSetting(data as AdminSetting)
