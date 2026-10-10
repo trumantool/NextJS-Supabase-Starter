@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { NewsletterForm } from '@/components/posts/NewsletterForm'
 import { PublishedPostList } from '@/components/posts/PublishedPostList'
 import { listAuthorLinks, listCategoryLinks } from '@/lib/blog-taxonomy'
+import { settlePublicBlog } from '@/lib/posts'
 import { listPublishedPosts, searchPublishedPosts } from '@/lib/posts-store'
 
 export const dynamic = 'force-dynamic'
@@ -17,9 +18,9 @@ export default async function PostsPage({ searchParams }: PageProps) {
   const { q } = await searchParams
   const query = typeof q === 'string' ? q.trim() : ''
   const [posts, categories, authors] = await Promise.all([
-    query ? searchPublishedPosts(query) : listPublishedPosts(),
-    listCategoryLinks(),
-    listAuthorLinks(),
+    settlePublicBlog('index', () => (query ? searchPublishedPosts(query) : listPublishedPosts()), []),
+    settlePublicBlog('categories', () => listCategoryLinks(), []),
+    settlePublicBlog('authors', () => listAuthorLinks(), []),
   ])
 
   return (

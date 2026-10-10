@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PublishedPostList } from '@/components/posts/PublishedPostList'
 import { listPostsForAuthor } from '@/lib/blog-taxonomy'
+import { settlePublicBlog } from '@/lib/posts'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,14 +10,14 @@ type PageProps = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params
-  const result = await listPostsForAuthor(slug)
+  const result = await settlePublicBlog('author metadata', () => listPostsForAuthor(slug), null)
   if (!result) return { title: 'Author' }
   return { title: result.author.display_name, description: result.author.bio ?? undefined }
 }
 
 export default async function AuthorPage({ params }: PageProps) {
   const { slug } = await params
-  const result = await listPostsForAuthor(slug)
+  const result = await settlePublicBlog('author', () => listPostsForAuthor(slug), null)
   if (!result) notFound()
 
   return (

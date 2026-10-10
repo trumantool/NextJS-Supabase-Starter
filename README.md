@@ -114,7 +114,7 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | No | Marks Checkout as configured. Hosted Checkout does not load Stripe.js |
 | `NEXT_PUBLIC_PRODUCTNAME` | Yes | Title, header, footer, homepage |
 | `POSTS_WEBSITE` | Yes for posts | Site written to and filtered on `public.posts.website`. Allowed: `edu`, `marketing-agent`, `afterallcare`. No default |
-| `ADMIN_SETTINGS_APP_KEY` | No | Which `admin_settings` rows this deployment reads and writes. Unset uses `app_key` NULL (the seeded single-app rows). Set a unique value on a shared database. Server-only |
+| `ADMIN_SETTINGS_APP_KEY` | No | Which `admin_settings` rows this deployment reads and writes. Unset or blank does not mention `app_key`, so a table without that column still works. Set a unique value only after the app_key migration exists. Server-only |
 | `CRON_SECRET` | Yes for cron | Bearer secret for `/api/cron/automations` and `/api/workers/automations` |
 | `NEXT_PUBLIC_THEME` | No | Body theme class (default `theme-sass3`) |
 | `NEXT_PUBLIC_GOOGLE_TAG` | No | Google Analytics |
@@ -125,7 +125,7 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 
 ### Admin settings on a shared database
 
-`public.admin_settings` can hold more than one app. `app_key` is NULL on every seeded row. Leave `ADMIN_SETTINGS_APP_KEY` unset and this deployment keeps reading and writing those rows. Site title, contact info, privacy, terms, and the other non-secret settings stay on the public pages. `secret` and `password` values are not selectable with the anon or authenticated key. The admin UI receives a blank field plus a flag that says whether a value is saved. An empty save keeps the stored value. **Clear saved value** stores an empty string. OpenRouter key resolution reads the row on the server with the service role.
+`public.admin_settings` can hold more than one app once `app_key` exists. Leave `ADMIN_SETTINGS_APP_KEY` unset on a database that has no `app_key` column, including the shared production database: this deployment then does not filter, select, or write `app_key`, and saves conflict on `option_name`. On a database that has the column, unset still does not add an `app_key` filter, so set the variable before sharing that database with another app. Site title, contact info, privacy, terms, and the other non-secret settings stay on the public pages. `secret` and `password` values are not selectable with the anon or authenticated key. The admin UI receives a blank field plus a flag that says whether a value is saved. An empty save keeps the stored value. **Clear saved value** stores an empty string. OpenRouter key resolution reads the row on the server with the service role.
 
 A clone that shares the database with other apps sets `ADMIN_SETTINGS_APP_KEY` to a unique slug, applies the latest migration (or pastes `supabase/schema.sql` on a new project), and copies its own rows. Until those rows exist, this deployment sees no admin settings and public pages use their code defaults.
 
@@ -157,7 +157,7 @@ Do not attach Marketing Agent’s Vercel project or database.
 
 ## Automations cron (wake ≠ execute)
 
-Vercel Cron hits both paths every **5 minutes** (`*/5 * * * *`):
+Vercel Cron hits both paths once a day. Hobby rejects `*/5 * * * *` with `cron_jobs_limits_reached`. [`nextjs/vercel.json`](./nextjs/vercel.json) uses `17 9 * * *` for the enqueue path and `47 9 * * *` for the worker. Faster polling needs Vercel Pro, or an external trigger such as an external cron that hits the endpoint with `Authorization: Bearer $CRON_SECRET`.
 
 | Path | Role |
 |---|---|
@@ -166,7 +166,7 @@ Vercel Cron hits both paths every **5 minutes** (`*/5 * * * *`):
 
 A cron wake only enqueues or claims. A run executes later on the worker tick. `Run now` in the UI also only **enqueues** (`trigger=manual`); it does not skip the worker.
 
-Both endpoints require `Authorization: Bearer $CRON_SECRET` and use the service-role client server-side. Hobby Vercel plans may only allow one cron per day — Pro (or a manual curl) is needed for the 5-minute cadence.
+Both endpoints require `Authorization: Bearer $CRON_SECRET` and use the service-role client server-side. The daily Hobby schedules above are the default. Use Vercel Pro or the same bearer request from an external cron when a run needs to start more often.
 
 ### Manual test (enqueue + execute)
 

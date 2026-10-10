@@ -1,7 +1,7 @@
 -- Scope admin_settings per deployment and hide password rows from anon SELECT.
 -- Later than 20261010120000 so a YouTube-key seed that still uses
 -- ON CONFLICT (option_name) can run first, while option_name is still unique.
--- NEVER apply this file to hosted projects cyczlgdaocwueaacqxsh or glplvrljdgowcwuubkau.
+-- Must not be applied to the shared production database glplvrljdgowcwuubkau.
 --
 -- Additive on existing data: new column app_key is NULL. NULL is the single-app
 -- starter scope (ADMIN_SETTINGS_APP_KEY unset). Uniqueness becomes

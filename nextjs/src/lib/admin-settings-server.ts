@@ -6,9 +6,12 @@
 import { createSSRClient } from '@/lib/supabase/server'
 import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
 import {
+  ADMIN_SETTINGS_COLUMNS,
   adminSettingsAppKey,
+  adminSettingsSave,
   filterByAdminSettingsAppKey,
   isConcealedAdminField,
+  type AdminSettingUpsertRow,
 } from '@/lib/admin-settings-scope'
 
 export function configuredAdminSettingsAppKey(): string | null {
@@ -51,6 +54,21 @@ export async function readScopedAdminSettings(
     map.set(row.option_name, row.option_value)
   }
   return map
+}
+
+/** Upsert one row. Unscoped conflict is option_name and the payload has no app_key. */
+export async function upsertScopedAdminSetting(row: AdminSettingUpsertRow) {
+  const appKey = configuredAdminSettingsAppKey()
+  const save = adminSettingsSave(appKey, row)
+  const admin = await createServerAdminClient()
+  const { data, error } = await admin
+    .from('admin_settings')
+    .upsert(save.row, { onConflict: save.onConflict })
+    .select(ADMIN_SETTINGS_COLUMNS)
+    .single()
+
+  if (error) throw new Error(error.message)
+  return data
 }
 
 export function dropConcealedAdminSettings<T extends { option_field_type: string }>(rows: readonly T[]): T[] {

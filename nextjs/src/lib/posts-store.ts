@@ -1,7 +1,7 @@
 import { revalidatePath } from 'next/cache'
 import { createSSRClient } from '@/lib/supabase/server'
 import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
-import type { Post } from '@/lib/types'
+import type { Database, Post } from '@/lib/types'
 import {
   BLOG_TYPE,
   SLUG_TAKEN_MESSAGE,
@@ -9,7 +9,11 @@ import {
   ilikeContainsPattern,
   isBlogType,
   isHttpUrl,
+  isMissingBlogSchemaError,
+  isMissingBodyDocError,
   isPostSlug,
+  logBlogSchemaGap,
+  publicPostWebsite,
   requirePostWebsite,
   resolvePublication,
   slugifyTitle,
@@ -36,8 +40,38 @@ export type PostInput = {
 const LIST_COLUMNS =
   'id, website, type, parent_id, title, slug, summary, cover_image_url, sort_order, status, published_at, author_id, updated_at'
 
-function currentWebsite(): PostWebsite {
+function requireWebsite(): PostWebsite {
   return requirePostWebsite(process.env.POSTS_WEBSITE)
+}
+
+function readPublicWebsite(): PostWebsite | null {
+  return publicPostWebsite(process.env.POSTS_WEBSITE)
+}
+
+function rowsOrEmpty<T>(
+  error: { code?: string; message: string } | null,
+  data: T[] | null,
+  label: string
+): T[] {
+  if (!error) return data ?? []
+  if (isMissingBlogSchemaError(error)) {
+    logBlogSchemaGap(label, error)
+    return []
+  }
+  throw new Error(error.message)
+}
+
+function rowOrEmpty<T>(
+  error: { code?: string; message: string } | null,
+  data: T | null,
+  label: string
+): T | null {
+  if (!error) return data
+  if (isMissingBlogSchemaError(error)) {
+    logBlogSchemaGap(label, error)
+    return null
+  }
+  throw new Error(error.message)
 }
 
 async function requireUserId(): Promise<string> {
@@ -107,8 +141,9 @@ export type PostListItem = Pick<
 >
 
 export async function listMyPosts(): Promise<PostListItem[]> {
-  const website = currentWebsite()
   await requireUserId()
+  const website = readPublicWebsite()
+  if (!website) return []
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('posts')
@@ -120,7 +155,7 @@ export async function listMyPosts(): Promise<PostListItem[]> {
   return (data ?? []) as PostListItem[]
 }
 
-const PUBLIC_COLUMNS =
+export const PUBLIC_COLUMNS =
   'id, website, type, title, slug, summary, body, cover_image_url, video_url, published_at, sort_order, author_id, updated_at'
 
 export type PublishedPost = {
@@ -144,7 +179,8 @@ function liveNow(): string {
 }
 
 export async function listPublishedPosts(): Promise<PublishedPost[]> {
-  const website = currentWebsite()
+  const website = readPublicWebsite()
+  if (!website) return []
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('posts')
@@ -155,12 +191,12 @@ export async function listPublishedPosts(): Promise<PublishedPost[]> {
     .lte('published_at', liveNow())
     .order('sort_order', { ascending: true })
     .order('published_at', { ascending: false })
-  if (error) throw new Error(error.message)
-  return (data ?? []) as PublishedPost[]
+  return rowsOrEmpty(error, data as PublishedPost[] | null, 'published posts')
 }
 
 export async function getPublishedPostBySlug(slug: string): Promise<PublishedPost | null> {
-  const website = currentWebsite()
+  const website = readPublicWebsite()
+  if (!website) return null
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('posts')
@@ -171,12 +207,12 @@ export async function getPublishedPostBySlug(slug: string): Promise<PublishedPos
     .lte('published_at', liveNow())
     .eq('slug', slug)
     .maybeSingle()
-  if (error) throw new Error(error.message)
-  return (data as PublishedPost | null) ?? null
+  return rowOrEmpty(error, (data as PublishedPost | null) ?? null, 'published post')
 }
 
 export async function searchPublishedPosts(query: string): Promise<PublishedPost[]> {
-  const website = currentWebsite()
+  const website = readPublicWebsite()
+  if (!website) return []
   const pattern = ilikeContainsPattern(query.trim())
   const quoted = `"${pattern.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
   const supabase = await createSSRClient()
@@ -189,12 +225,11 @@ export async function searchPublishedPosts(query: string): Promise<PublishedPost
     .lte('published_at', liveNow())
     .or(`title.ilike.${quoted},summary.ilike.${quoted}`)
     .limit(20)
-  if (error) throw new Error(error.message)
-  return (data ?? []) as PublishedPost[]
+  return rowsOrEmpty(error, data as PublishedPost[] | null, 'post search')
 }
 
 export async function getMyPost(id: string): Promise<Post> {
-  const website = currentWebsite()
+  const website = requireWebsite()
   await requireUserId()
   const supabase = await createSSRClient()
   const { data, error } = await supabase
@@ -210,49 +245,70 @@ export async function getMyPost(id: string): Promise<Post> {
 }
 
 export async function createPost(input: PostInput): Promise<Post> {
-  const website = currentWebsite()
+  const website = requireWebsite()
   const userId = await requireUserId()
   const fields = await normalizePost(input, website)
   const supabase = await createSSRClient()
-  const { data, error } = await supabase
+  let result = await supabase
     .from('posts')
     .insert({ ...fields, author_id: userId, website })
     .select('*')
     .single()
-  if (error) throwPostWriteError(error)
-  const saved = data as Post
+  if (result.error && isMissingBodyDocError(result.error)) {
+    logBlogSchemaGap('posts.body_doc', result.error)
+    result = await supabase
+      .from('posts')
+      .insert({ ...omitBodyDoc(fields), author_id: userId, website })
+      .select('*')
+      .single()
+  }
+  if (result.error) throwPostWriteError(result.error)
+  const saved = result.data as Post
   refreshPublicBlog(blogSlugsToRefresh(null, saved))
   return saved
 }
 
 export async function updatePost(id: string, input: PostInput): Promise<Post> {
-  const website = currentWebsite()
+  const website = requireWebsite()
   const userId = await requireUserId()
   const existing = await getMyPost(id)
   if (existing.author_id !== userId || existing.website !== website) throw new Error('Post not found')
   const fields = await normalizePost(input, website, existing)
   const supabase = await createSSRClient()
-  const { data, error } = await supabase
-    .from('posts')
-    .update({ ...fields, website })
-    .eq('id', id)
-    .eq('author_id', userId)
-    .eq('website', website)
-    .eq('type', BLOG_TYPE)
-    .select('*')
-    .single()
-  if (error) throwPostWriteError(error)
-  const saved = data as Post
-  const { error: revisionError } = await supabase.from('blog_revisions').insert({
+  const runUpdate = (values: PostUpdate) =>
+    supabase
+      .from('posts')
+      .update({ ...values, website })
+      .eq('id', id)
+      .eq('author_id', userId)
+      .eq('website', website)
+      .eq('type', BLOG_TYPE)
+      .select('*')
+      .single()
+  let result = await runUpdate(fields)
+  if (result.error && isMissingBodyDocError(result.error)) {
+    logBlogSchemaGap('posts.body_doc', result.error)
+    result = await runUpdate(omitBodyDoc(fields))
+  }
+  if (result.error) throwPostWriteError(result.error)
+  const saved = result.data as Post
+  const revision = {
     post_id: saved.id,
     editor_id: userId,
     title: saved.title,
     slug: saved.slug,
     summary: saved.summary,
     body: saved.body,
-    body_doc: saved.body_doc,
-  })
-  if (revisionError) throw new Error(revisionError.message)
+    ...(saved.body_doc === undefined ? {} : { body_doc: saved.body_doc }),
+  }
+  const { error: revisionError } = await supabase.from('blog_revisions').insert(revision)
+  if (revisionError) {
+    if (isMissingBlogSchemaError(revisionError) || isMissingBodyDocError(revisionError)) {
+      logBlogSchemaGap('blog_revisions', revisionError)
+    } else {
+      throw new Error(revisionError.message)
+    }
+  }
   refreshPublicBlog(
     blogSlugsToRefresh(
       { status: existing.status, published_at: existing.published_at, slug: existing.slug },
@@ -263,7 +319,7 @@ export async function updatePost(id: string, input: PostInput): Promise<Post> {
 }
 
 export async function deletePost(id: string): Promise<void> {
-  const website = currentWebsite()
+  const website = requireWebsite()
   const userId = await requireUserId()
   const existing = await getMyPost(id)
   const supabase = await createSSRClient()
@@ -281,6 +337,14 @@ export async function deletePost(id: string): Promise<void> {
       null
     )
   )
+}
+
+type PostUpdate = Database['public']['Tables']['posts']['Update']
+
+function omitBodyDoc<T extends { body_doc?: unknown }>(fields: T): Omit<T, 'body_doc'> {
+  const copy = { ...fields }
+  delete copy.body_doc
+  return copy
 }
 
 function refreshPublicBlog(slugs: string[]) {

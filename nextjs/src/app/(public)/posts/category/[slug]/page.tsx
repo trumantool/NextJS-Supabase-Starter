@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PublishedPostList } from '@/components/posts/PublishedPostList'
 import { listPostsForCategory } from '@/lib/blog-taxonomy'
+import { settlePublicBlog } from '@/lib/posts'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,14 +10,14 @@ type PageProps = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params
-  const result = await listPostsForCategory(slug)
+  const result = await settlePublicBlog('category metadata', () => listPostsForCategory(slug), null)
   if (!result) return { title: 'Category' }
   return { title: result.name, description: `Posts in ${result.name}` }
 }
 
 export default async function CategoryPage({ params }: PageProps) {
   const { slug } = await params
-  const result = await listPostsForCategory(slug)
+  const result = await settlePublicBlog('category', () => listPostsForCategory(slug), null)
   if (!result) notFound()
 
   return (

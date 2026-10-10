@@ -4,6 +4,7 @@ import { createSSRClient } from '@/lib/supabase/server'
 import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
 import { Tables } from '@/lib/types'
 import {
+  ADMIN_SETTINGS_COLUMNS,
   filterByAdminSettingsAppKey,
   isConcealedAdminField,
   presentAdminSettingForBrowser,
@@ -13,6 +14,7 @@ import {
   configuredAdminSettingsAppKey,
   dropConcealedAdminSettings,
   requireCurrentUserAdmin,
+  upsertScopedAdminSetting,
 } from '@/lib/admin-settings-server'
 
 type AdminSetting = Tables<'admin_settings'>
@@ -52,7 +54,7 @@ export async function getAdminSettings(): Promise<AdminSettingView[]> {
   // Service role sees secret and password rows. Values are blanked before the browser.
   const admin = await createServerAdminClient()
   const scoped = filterByAdminSettingsAppKey(
-    admin.from('admin_settings').select('*').order('created_at', { ascending: true }),
+    admin.from('admin_settings').select(ADMIN_SETTINGS_COLUMNS).order('created_at', { ascending: true }),
     configuredAdminSettingsAppKey()
   )
   const { data, error } = await scoped
@@ -105,10 +107,10 @@ export async function updateAdminSetting(
 ): Promise<AdminSettingView> {
   await requireCurrentUserAdmin()
 
-  const admin = await createServerAdminClient()
   const appKey = configuredAdminSettingsAppKey()
+  const admin = await createServerAdminClient()
   const existingQuery = filterByAdminSettingsAppKey(
-    admin.from('admin_settings').select('*').eq('id', id),
+    admin.from('admin_settings').select(ADMIN_SETTINGS_COLUMNS).eq('id', id),
     appKey
   )
   const { data: existing, error: readError } = await existingQuery.maybeSingle()
@@ -124,15 +126,13 @@ export async function updateAdminSetting(
   )
   if (write.keepExisting) return presentAdminSetting(row)
 
-  const updateQuery = filterByAdminSettingsAppKey(
-    admin
-      .from('admin_settings')
-      .update({ option_value: write.optionValue, updated_at: new Date().toISOString() })
-      .eq('id', id),
-    appKey
-  )
-  const { data, error } = await updateQuery.select().single()
-
-  if (error) throw new Error(error.message)
-  return presentAdminSetting(data as AdminSetting)
+  const saved = await upsertScopedAdminSetting({
+    option_name: row.option_name,
+    option_value: write.optionValue,
+    option_field_type: row.option_field_type,
+    option_title: row.option_title,
+    option_description: row.option_description,
+    updated_at: new Date().toISOString(),
+  })
+  return presentAdminSetting(saved as AdminSetting)
 }

@@ -3,11 +3,12 @@
 import { createSSRClient } from '@/lib/supabase/server'
 import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
 import { Tables } from '@/lib/types'
-import { filterByAdminSettingsAppKey } from '@/lib/admin-settings-scope'
+import { ADMIN_SETTINGS_COLUMNS, filterByAdminSettingsAppKey } from '@/lib/admin-settings-scope'
 import {
   configuredAdminSettingsAppKey,
   dropConcealedAdminSettings,
   requireCurrentUserAdmin,
+  upsertScopedAdminSetting,
 } from '@/lib/admin-settings-server'
 
 type AdminSetting = Tables<'admin_settings'>
@@ -23,7 +24,7 @@ export async function getPrivacySettings(): Promise<AdminSetting[]> {
   const scoped = filterByAdminSettingsAppKey(
     supabase
       .from('admin_settings')
-      .select('*')
+      .select(ADMIN_SETTINGS_COLUMNS)
       .in('option_name', [
         'privacy_policy',
         'site_title',
@@ -56,16 +57,23 @@ export async function updatePrivacyPolicy(
 ): Promise<AdminSetting> {
   await requireCurrentUserAdmin()
 
+  const appKey = configuredAdminSettingsAppKey()
   const admin = await createServerAdminClient()
-  const scoped = filterByAdminSettingsAppKey(
-    admin
-      .from('admin_settings')
-      .update({ option_value: content, updated_at: new Date().toISOString() })
-      .eq('option_name', 'privacy_policy'),
-    configuredAdminSettingsAppKey()
+  const existingQuery = filterByAdminSettingsAppKey(
+    admin.from('admin_settings').select(ADMIN_SETTINGS_COLUMNS).eq('option_name', 'privacy_policy'),
+    appKey
   )
-  const { data, error } = await scoped.select().single()
+  const { data: existing, error: readError } = await existingQuery.maybeSingle()
+  if (readError) throw new Error(readError.message)
+  if (!existing) throw new Error('Setting not found')
 
-  if (error) throw new Error(error.message)
-  return data as AdminSetting
+  const saved = await upsertScopedAdminSetting({
+    option_name: existing.option_name,
+    option_value: content,
+    option_field_type: existing.option_field_type,
+    option_title: existing.option_title,
+    option_description: existing.option_description,
+    updated_at: new Date().toISOString(),
+  })
+  return saved as AdminSetting
 }
