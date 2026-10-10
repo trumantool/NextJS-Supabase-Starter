@@ -4,8 +4,9 @@
  * openrouter_force_platform_key skips BYOK.
  * Secret admin rows are read with the service role. Values are never returned to the browser.
  */
-import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
+import { readScopedAdminSettings } from '@/lib/admin-settings-server'
 import { isForcePlatformKey, pickOpenRouterKey } from '@/lib/openrouter-key-resolve'
+import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
 
 const FORCE_OPTION = 'openrouter_force_platform_key'
 const ADMIN_KEY_OPTION = 'openrouter_api_key'
@@ -13,21 +14,21 @@ const ADMIN_KEY_OPTION = 'openrouter_api_key'
 export { isForcePlatformKey, pickOpenRouterKey }
 
 export async function resolveOpenRouterKey(userId?: string): Promise<string> {
-  const admin = await createServerAdminClient()
-  const { data: settings, error: settingsError } = await admin
-    .from('admin_settings')
-    .select('option_name, option_value')
-    .in('option_name', [FORCE_OPTION, ADMIN_KEY_OPTION])
-
-  if (settingsError) {
-    console.error('resolveOpenRouterKey admin settings:', settingsError.message)
+  let byName = new Map<string, string>()
+  try {
+    byName = await readScopedAdminSettings([FORCE_OPTION, ADMIN_KEY_OPTION])
+  } catch (error) {
+    console.error(
+      'resolveOpenRouterKey admin settings:',
+      error instanceof Error ? error.message : error
+    )
   }
 
-  const byName = new Map((settings ?? []).map((row) => [row.option_name, row.option_value]))
   const forcePlatform = isForcePlatformKey(byName.get(FORCE_OPTION))
 
   let byok = ''
   if (!forcePlatform && userId) {
+    const admin = await createServerAdminClient()
     const { data, error } = await admin
       .from('user_settings')
       .select('openrouter_api_key')
