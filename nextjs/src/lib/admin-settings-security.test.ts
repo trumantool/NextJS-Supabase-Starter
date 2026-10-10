@@ -4,8 +4,11 @@ import { describe, it } from 'node:test'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  ADMIN_SETTINGS_COLUMNS,
   adminSettingsAppKey,
+  adminSettingsSave,
   filterAdminSettingsByAppKey,
+  filterByAdminSettingsAppKey,
   isConcealedAdminField,
   ledgerMarkupArgument,
   presentAdminSettingForBrowser,
@@ -88,6 +91,12 @@ describe('admin_settings select policies', () => {
       read('supabase/migrations/20261010160000_admin_settings_app_scope.sql'),
       /REVOKE EXECUTE ON FUNCTION public\.record_llm_turn_usage\([\s\S]*FROM PUBLIC, anon, authenticated/
     )
+  })
+
+  it('the app_key migration must not be applied to the shared production database', () => {
+    const sql = read('supabase/migrations/20261010160000_admin_settings_app_scope.sql')
+    assert.equal(sql.includes('cyczlgdaocwueaacqxsh'), false)
+    assert.match(sql, /Must not be applied to the shared production database glplvrljdgowcwuubkau/)
   })
 })
 
@@ -186,7 +195,79 @@ describe('admin settings app key scope', () => {
     assert.equal(ledgerMarkupArgument('clone-a', null, true), 0)
     assert.equal(ledgerMarkupArgument('clone-a', '1.5', false), 1.5)
   })
+
+  it('unscoped queries never mention app_key', () => {
+    const { query, calls } = traceAdminQuery()
+    filterByAdminSettingsAppKey(
+      query.select(ADMIN_SETTINGS_COLUMNS).eq('option_name', 'site_title'),
+      adminSettingsAppKey('   ')
+    )
+    const text = calls.join('\n')
+    assert.equal(text.includes('app_key'), false)
+    assert.match(text, /select id, option_name/)
+    assert.equal(ADMIN_SETTINGS_COLUMNS.includes('app_key'), false)
+  })
+
+  it('unscoped saves use option_name conflict handling', () => {
+    const save = adminSettingsSave(null, {
+      option_name: 'site_title',
+      option_value: 'Starter',
+      option_field_type: 'text',
+      option_title: 'Site title',
+      option_description: null,
+      updated_at: '2026-10-10T00:00:00.000Z',
+      app_key: 'drop-me',
+    })
+    assert.equal(save.onConflict, 'option_name')
+    assert.equal(Object.hasOwn(save.row, 'app_key'), false)
+    const { query, calls } = traceAdminQuery()
+    query.upsert(save.row, { onConflict: save.onConflict })
+    const text = calls.join('\n')
+    assert.match(text, /onConflict=option_name/)
+    assert.equal(text.includes('app_key'), false)
+  })
+
+  it('scoped mode still filters by app_key', () => {
+    const { query, calls } = traceAdminQuery()
+    filterByAdminSettingsAppKey(query.select(ADMIN_SETTINGS_COLUMNS), 'clone-a')
+    assert.ok(calls.includes('eq app_key clone-a'))
+    const save = adminSettingsSave('clone-a', {
+      option_name: 'site_title',
+      option_value: 'Clone A',
+      option_field_type: 'text',
+      option_title: 'Site title',
+      option_description: null,
+      updated_at: '2026-10-10T00:00:00.000Z',
+    })
+    assert.equal(save.onConflict, 'app_key,option_name')
+    assert.equal(save.row.app_key, 'clone-a')
+  })
 })
+
+function traceAdminQuery() {
+  const calls: string[] = []
+  const query = {
+    select(columns: string) {
+      calls.push(`select ${columns}`)
+      return query
+    },
+    eq(column: string, value: string) {
+      calls.push(`eq ${column} ${value}`)
+      return query
+    },
+    is(column: string, value: unknown) {
+      calls.push(`is ${column} ${String(value)}`)
+      return query
+    },
+    upsert(payload: Record<string, unknown>, options: { onConflict: string }) {
+      calls.push(
+        `upsert onConflict=${options.onConflict} keys=${Object.keys(payload).sort().join(',')}`
+      )
+      return query
+    },
+  }
+  return { query, calls }
+}
 
 describe('admin settings readers', () => {
   const readers = [
@@ -244,6 +325,24 @@ describe('admin settings readers', () => {
 
     const server = read('nextjs/src/lib/admin-settings-server.ts')
     assert.match(server, /createServerAdminClient/)
+    assert.match(server, /adminSettingsSave/)
     assert.equal(server.includes('NEXT_PUBLIC_'), false)
+    assert.equal(server.includes(".is('app_key'"), false)
+  })
+
+  it('readers and writers do not select or null-filter app_key', () => {
+    for (const file of [
+      'nextjs/src/app/(dashboard)/admin/actions.ts',
+      'nextjs/src/lib/actions/privacy.ts',
+      'nextjs/src/lib/actions/terms.ts',
+      'nextjs/src/lib/admin-settings-server.ts',
+    ]) {
+      const source = read(file)
+      assert.equal(source.includes(".is('app_key'"), false, file)
+      assert.equal(source.includes("select('*')"), false, file)
+      assert.equal(source.includes('select("*")'), false, file)
+      assert.equal(source.includes("onConflict: 'app_key,option_name'"), false, file)
+      assert.match(source, /filterByAdminSettingsAppKey|upsertScopedAdminSetting|adminSettingsSave/)
+    }
   })
 })

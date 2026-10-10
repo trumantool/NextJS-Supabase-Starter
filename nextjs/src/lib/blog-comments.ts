@@ -1,3 +1,4 @@
+import { isMissingBlogSchemaError, logBlogSchemaGap } from '@/lib/posts'
 import { createSSRClient } from '@/lib/supabase/server'
 
 export type VisibleComment = {
@@ -14,6 +15,12 @@ export async function listVisibleComments(postId: string): Promise<VisibleCommen
     .eq('post_id', postId)
     .eq('status', 'visible')
     .order('created_at', { ascending: true })
-  if (error) throw new Error(error.message)
+  if (error) {
+    if (isMissingBlogSchemaError(error)) {
+      logBlogSchemaGap('blog_comments', error)
+      return []
+    }
+    throw new Error(error.message)
+  }
   return data ?? []
 }

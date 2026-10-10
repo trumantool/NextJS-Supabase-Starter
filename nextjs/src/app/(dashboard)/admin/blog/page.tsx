@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { isCurrentUserAdmin } from '@/app/(dashboard)/admin/actions'
 import { deleteBlogPost, setBlogCommentStatus, unpublishBlogPost } from '@/app/(dashboard)/admin/blog/actions'
-import { requirePostWebsite } from '@/lib/posts'
+import { isMissingBlogSchemaError, logBlogSchemaGap, requirePostWebsite } from '@/lib/posts'
 import { createSSRClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -38,8 +38,12 @@ export default async function AdminBlogPage() {
       .select('id, post_id, body, status, created_at')
       .in('post_id', postIds)
       .order('created_at', { ascending: false })
-    if (commentError) throw new Error(commentError.message)
-    comments = data ?? []
+    if (commentError) {
+      if (!isMissingBlogSchemaError(commentError)) throw new Error(commentError.message)
+      logBlogSchemaGap('blog_comments', commentError)
+    } else {
+      comments = data ?? []
+    }
   }
 
   const { data: subscribers, error: subscriberError } = await supabase
@@ -47,7 +51,10 @@ export default async function AdminBlogPage() {
     .select('id, email, status, created_at')
     .eq('website', website)
     .order('created_at', { ascending: false })
-  if (subscriberError) throw new Error(subscriberError.message)
+  if (subscriberError && !isMissingBlogSchemaError(subscriberError)) {
+    throw new Error(subscriberError.message)
+  }
+  if (subscriberError) logBlogSchemaGap('newsletter_subscribers', subscriberError)
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -10,7 +10,10 @@ import {
   isHttpUrl,
   isPostSlug,
   isPostWebsite,
+  isMissingBlogSchemaError,
+  isMissingBodyDocError,
   POSTS_WEBSITE_ERROR,
+  publicPostWebsite,
   publicSlugConflictMessage,
   requirePostWebsite,
   SLUG_TAKEN_MESSAGE,
@@ -77,6 +80,47 @@ describe('post validators', () => {
     for (const value of [undefined, '', '  ', 'EDU', 'blog', 'marketing']) {
       assert.throws(() => requirePostWebsite(value), { message: POSTS_WEBSITE_ERROR })
     }
+  })
+
+  it('unset and invalid POSTS_WEBSITE fall back to an empty public site', () => {
+    const warnings: string[] = []
+    const warn = (message: string) => {
+      warnings.push(message)
+    }
+    assert.equal(publicPostWebsite(undefined, warn), null)
+    assert.equal(publicPostWebsite('', warn), null)
+    assert.equal(publicPostWebsite('   ', warn), null)
+    assert.equal(publicPostWebsite('blog', warn), null)
+    assert.equal(publicPostWebsite('EDU', warn), null)
+    assert.equal(publicPostWebsite(' afterallcare ', warn), 'afterallcare')
+    assert.equal(publicPostWebsite('edu', warn), 'edu')
+    assert.equal(publicPostWebsite('marketing-agent', warn), 'marketing-agent')
+    assert.deepEqual(warnings, [
+      POSTS_WEBSITE_ERROR,
+      POSTS_WEBSITE_ERROR,
+      POSTS_WEBSITE_ERROR,
+      POSTS_WEBSITE_ERROR,
+      POSTS_WEBSITE_ERROR,
+    ])
+    assert.equal(httpStatusForPostError(POSTS_WEBSITE_ERROR), 503)
+    for (const code of ['42P01', '42703', 'PGRST200', 'PGRST204', 'PGRST205']) {
+      assert.equal(isMissingBlogSchemaError({ code, message: 'missing' }), true)
+    }
+    assert.equal(isMissingBlogSchemaError({ code: '23505', message: 'duplicate' }), false)
+    assert.equal(isMissingBlogSchemaError(null), false)
+    assert.equal(isMissingBodyDocError({ code: 'PGRST204', message: "Could not find the 'body_doc' column" }), true)
+    assert.equal(isMissingBodyDocError({ code: '42703', message: 'column website does not exist' }), false)
+
+    const store = readFileSync(join(root, 'nextjs/src/lib/posts-store.ts'), 'utf8')
+    assert.match(store, /publicPostWebsite\(process\.env\.POSTS_WEBSITE\)/)
+    const columns = store.match(/const PUBLIC_COLUMNS =\s+'([^']+)'/)
+    assert.ok(columns)
+    assert.equal(columns[1].includes('body_doc'), false)
+    const index = readFileSync(join(root, 'nextjs/src/app/(public)/posts/page.tsx'), 'utf8')
+    assert.match(index, /searchPublishedPosts/)
+    assert.match(index, /settlePublicBlog/)
+    const api = readFileSync(join(root, 'nextjs/src/app/api/posts/route.ts'), 'utf8')
+    assert.match(api, /listMyPosts/)
   })
 
   it('accepts only http(s) URLs', () => {

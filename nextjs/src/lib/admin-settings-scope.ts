@@ -2,37 +2,80 @@
  * Pure helpers for admin_settings masking and per-app scope.
  * Safe to import from client components. No Supabase client and no secret values.
  *
- * ADMIN_SETTINGS_APP_KEY unset (or blank) selects rows whose app_key is NULL.
- * That is the single-app starter: existing and seeded rows keep working.
- * A shared-database clone sets the env var and only sees rows with that key.
+ * ADMIN_SETTINGS_APP_KEY unset (or blank) does not mention app_key. That keeps
+ * a database whose admin_settings table has no app_key column working: reads
+ * and writes use option_name only. A clone that has applied the app_key
+ * migration sets the env var and filters plus upserts on (app_key, option_name).
  */
 
 export const ADMIN_SETTINGS_APP_KEY_ENV = 'ADMIN_SETTINGS_APP_KEY'
 
 const MARKUP_PATTERN = /^-?\d+(\.\d+)?$/
 
-/** Blank and unset both mean the NULL app_key rows (single-app starter). */
+/** Blank and unset both mean unscoped: do not read or write app_key. */
 export function adminSettingsAppKey(raw: string | null | undefined): string | null {
   const trimmed = raw?.trim() ?? ''
   return trimmed.length > 0 ? trimmed : null
+}
+
+/**
+ * Columns on the shared admin_settings table. app_key is omitted so an
+ * unscoped select does not require the column.
+ */
+export const ADMIN_SETTINGS_COLUMNS =
+  'id, option_name, option_value, option_field_type, option_title, option_description, created_at, updated_at' as const
+
+export type AdminSettingUpsertRow = {
+  option_name: string
+  option_value: string
+  option_field_type: string
+  option_title: string
+  option_description: string | null
+  updated_at: string
+}
+
+export type AdminSettingsSave = {
+  onConflict: 'option_name' | 'app_key,option_name'
+  row: AdminSettingUpsertRow & { app_key?: string }
+}
+
+/**
+ * Unscoped saves conflict on option_name and never include app_key.
+ * Scoped saves keep the (app_key, option_name) pair.
+ */
+export function adminSettingsSave(
+  appKey: string | null,
+  row: AdminSettingUpsertRow & { app_key?: string | null }
+): AdminSettingsSave {
+  const rest: AdminSettingUpsertRow = {
+    option_name: row.option_name,
+    option_value: row.option_value,
+    option_field_type: row.option_field_type,
+    option_title: row.option_title,
+    option_description: row.option_description,
+    updated_at: row.updated_at,
+  }
+  if (appKey === null || appKey.trim() === '') {
+    return { onConflict: 'option_name', row: rest }
+  }
+  return { onConflict: 'app_key,option_name', row: { ...rest, app_key: appKey } }
 }
 
 export function isConcealedAdminField(fieldType: string | null | undefined): boolean {
   return fieldType === 'secret' || fieldType === 'password'
 }
 
-type AppKeyFilter = {
+type AppKeyEq = {
   eq: (column: 'app_key', value: string) => unknown
-  is: (column: 'app_key', value: null) => unknown
 }
 
-/** PostgREST filter: NULL app_key when the env var is unset, else equality. */
+/**
+ * PostgREST filter. Unscoped queries are returned unchanged so the request
+ * never mentions app_key. Scoped queries add eq('app_key', value).
+ */
 export function filterByAdminSettingsAppKey<Q>(query: Q, appKey: string | null): Q {
-  const builder = query as unknown as AppKeyFilter
-  if (appKey === null) {
-    return builder.is('app_key', null) as Q
-  }
-  return builder.eq('app_key', appKey) as Q
+  if (appKey === null || appKey.trim() === '') return query
+  return (query as unknown as AppKeyEq).eq('app_key', appKey) as Q
 }
 
 export function matchesAdminSettingsAppKey(
@@ -89,7 +132,7 @@ export function resolveAdminSettingWrite(
 
 /**
  * Markup passed to record_llm_turn_usage.
- * A failed read with no app key returns null so SQL can read the NULL app_key row.
+ * A failed unscoped read returns null so SQL can use its own markup fallback.
  * A failed read with an app key returns 0 so another app's row is not used.
  */
 export function ledgerMarkupArgument(

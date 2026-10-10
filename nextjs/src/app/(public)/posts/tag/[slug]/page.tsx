@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PublishedPostList } from '@/components/posts/PublishedPostList'
 import { listPostsForTag } from '@/lib/blog-taxonomy'
+import { settlePublicBlog } from '@/lib/posts'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,14 +10,14 @@ type PageProps = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params
-  const result = await listPostsForTag(slug)
+  const result = await settlePublicBlog('tag metadata', () => listPostsForTag(slug), null)
   if (!result) return { title: 'Tag' }
   return { title: result.name, description: `Posts tagged ${result.name}` }
 }
 
 export default async function TagPage({ params }: PageProps) {
   const { slug } = await params
-  const result = await listPostsForTag(slug)
+  const result = await settlePublicBlog('tag', () => listPostsForTag(slug), null)
   if (!result) notFound()
 
   return (

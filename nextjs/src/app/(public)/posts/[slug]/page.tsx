@@ -6,6 +6,7 @@ import { CommentForm } from '@/components/posts/CommentForm'
 import { listVisibleComments } from '@/lib/blog-comments'
 import { loadPublishedArticle } from '@/lib/blog-taxonomy'
 import { articleJsonLd, postCanonical, publicSiteOrigin } from '@/lib/blog-seo'
+import { settlePublicBlog } from '@/lib/posts'
 import { createSSRClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -14,7 +15,7 @@ type PageProps = { params: Promise<{ slug: string }> }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const article = await loadPublishedArticle(slug)
+  const article = await settlePublicBlog('article metadata', () => loadPublishedArticle(slug), null)
   if (!article) return { title: 'Post' }
   const { post } = article
   const origin = publicSiteOrigin(process.env.NEXT_PUBLIC_SITE_ORIGIN)
@@ -43,7 +44,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PostPage({ params }: PageProps) {
   const { slug } = await params
-  const article = await loadPublishedArticle(slug)
+  const article = await settlePublicBlog('article', () => loadPublishedArticle(slug), null)
   if (!article) notFound()
   const { post, categories, tags, author, related } = article
   const origin = publicSiteOrigin(process.env.NEXT_PUBLIC_SITE_ORIGIN)
@@ -52,7 +53,7 @@ export default async function PostPage({ params }: PageProps) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  const comments = await listVisibleComments(post.id)
+  const comments = await settlePublicBlog('comments', () => listVisibleComments(post.id), [])
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
