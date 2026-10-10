@@ -2,7 +2,7 @@
 -- Fresh starter databases only.
 -- NEVER apply this file to production project glplvrljdgowcwuubkau.
 -- option_field_type = secret keeps this row off anon and authenticated SELECT.
--- The public read policy does not call authenticative.is_admin().
+-- This file only inserts a row. It does not add a policy.
 -- No real key value belongs in git. Enter the key later in Admin Settings.
 
 INSERT INTO public.admin_settings (
