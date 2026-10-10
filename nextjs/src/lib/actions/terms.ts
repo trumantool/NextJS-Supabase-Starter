@@ -2,6 +2,10 @@
 
 import { createSSRClient } from '@/lib/supabase/server'
 import { Tables } from '@/lib/types'
+import {
+  omitSecretAdminSettings,
+  publicAdminSettingNames,
+} from '@/lib/admin-setting-secrets'
 
 type AdminSetting = Tables<'admin_settings'>
 
@@ -16,7 +20,7 @@ export async function getTermsSettings(): Promise<AdminSetting[]> {
   const { data, error } = await supabase
     .from('admin_settings')
     .select('*')
-    .in('option_name', [
+    .in('option_name', publicAdminSettingNames([
       'terms_of_service',
       'site_title',
       'company_name',
@@ -25,14 +29,15 @@ export async function getTermsSettings(): Promise<AdminSetting[]> {
       'contact_address',
       'support_hours',
       'phone_number',
-    ])
+    ]))
+    .neq('option_field_type', 'secret')
 
   if (error) {
     console.error('Failed to load terms settings:', error)
     throw new Error('Failed to load terms settings')
   }
 
-  return (data ?? []) as AdminSetting[]
+  return omitSecretAdminSettings((data ?? []) as AdminSetting[])
 }
 
 /**

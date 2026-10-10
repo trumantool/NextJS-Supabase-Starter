@@ -3,10 +3,30 @@
 import { createSSRClient } from '@/lib/supabase/server'
 import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
 import { Tables } from '@/lib/types'
+import {
+  omitSecretAdminSettings,
+  OPENROUTER_API_KEY_OPTION,
+  publicAdminSettingNames,
+  YOUTUBE_DATA_API_KEY_OPTION,
+} from '@/lib/admin-setting-secrets'
 
 type AdminSetting = Tables<'admin_settings'>
 
 export type AdminSettingView = AdminSetting & { secret_is_set: boolean }
+
+function placeYoutubeKeyBesideOpenRouter<T extends { option_name: string }>(rows: T[]): T[] {
+  const youtubeIndex = rows.findIndex((row) => row.option_name === YOUTUBE_DATA_API_KEY_OPTION)
+  const openRouterIndex = rows.findIndex((row) => row.option_name === OPENROUTER_API_KEY_OPTION)
+  if (youtubeIndex < 0 || openRouterIndex < 0 || youtubeIndex === openRouterIndex + 1) {
+    return rows
+  }
+  const next = rows.slice()
+  const [youtube] = next.splice(youtubeIndex, 1)
+  if (!youtube) return rows
+  const insertAt = next.findIndex((row) => row.option_name === OPENROUTER_API_KEY_OPTION)
+  next.splice(insertAt + 1, 0, youtube)
+  return next
+}
 
 function presentAdminSetting(row: AdminSetting): AdminSettingView {
   if (row.option_field_type === 'secret') {
@@ -66,24 +86,30 @@ export async function getAdminSettings(): Promise<AdminSettingView[]> {
     .order('created_at', { ascending: true })
 
   if (error) throw new Error(error.message)
-  return ((data ?? []) as AdminSetting[]).map(presentAdminSetting)
+  const presented = ((data ?? []) as AdminSetting[]).map(presentAdminSetting)
+  return placeYoutubeKeyBesideOpenRouter(presented)
 }
 
 /**
- * Fetches admin settings by option name. Publicly readable (RLS allows anon
- * and authenticated SELECT). Returns a map of option_name -> option_value.
- * Missing options are simply absent from the map so callers can fall back to
- * defaults.
+ * Fetches non-secret admin settings by option name. Publicly readable (RLS
+ * allows anon and authenticated SELECT of rows whose option_field_type is not
+ * secret). Secret names, including youtube_data_api_key, are dropped before
+ * the query. Returns a map of option_name -> option_value. Missing options
+ * are simply absent from the map so callers can fall back to defaults.
  */
 export async function getAdminSettingsByNames(
   names: string[]
 ): Promise<Record<string, string>> {
+  const publicNames = publicAdminSettingNames(names)
+  if (publicNames.length === 0) return {}
+
   const supabase = await createSSRClient()
 
   const { data, error } = await supabase
     .from('admin_settings')
     .select('option_name, option_value')
-    .in('option_name', names)
+    .in('option_name', publicNames)
+    .neq('option_field_type', 'secret')
 
   if (error) {
     console.error('Failed to fetch admin settings:', error)
@@ -91,7 +117,7 @@ export async function getAdminSettingsByNames(
   }
 
   const result: Record<string, string> = {}
-  for (const row of data ?? []) {
+  for (const row of omitSecretAdminSettings(data ?? [])) {
     result[row.option_name] = row.option_value
   }
   return result

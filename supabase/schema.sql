@@ -1991,6 +1991,13 @@ VALUES
     'Platform OpenRouter key. Leave empty to use the OPENROUTER_API_KEY environment variable. Never commit a real key.'
   ),
   (
+    'youtube_data_api_key',
+    '',
+    'secret',
+    'YouTube Data API key',
+    'Used for the future autoblogging feature. Never commit a real key.'
+  ),
+  (
     'openrouter_force_platform_key',
     'false',
     'boolean',
