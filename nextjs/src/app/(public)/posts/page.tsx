@@ -1,7 +1,17 @@
 import Link from 'next/link'
-import { NewsletterForm } from '@/components/posts/NewsletterForm'
-import { PublishedPostList } from '@/components/posts/PublishedPostList'
-import { listAuthorLinks, listCategoryLinks } from '@/lib/blog-taxonomy'
+import { FeaturedPost, PublishedPostList } from '@/components/posts/PublishedPostList'
+import { PostsPageFrame } from '@/components/posts/PostsPageFrame'
+import { PostsPagination } from '@/components/posts/PostsPagination'
+import { PostsSidebar } from '@/components/posts/PostsSidebar'
+import { SearchForm } from '@/components/posts/SearchForm'
+import { paginate, parsePageQuery, parseSearchQuery } from '@/lib/blog-roll'
+import {
+  authorsForUserIds,
+  listAuthorLinks,
+  listCategoryLinks,
+  listTagLinks,
+  newsletterBlockAvailable,
+} from '@/lib/blog-taxonomy'
 import { settlePublicBlog } from '@/lib/posts'
 import { listPublishedPosts, searchPublishedPosts } from '@/lib/posts-store'
 
@@ -12,67 +22,64 @@ export const metadata = {
   description: 'Published posts.',
 }
 
-type PageProps = { searchParams: Promise<{ q?: string }> }
+type PageProps = { searchParams: Promise<{ q?: string | string[]; page?: string | string[] }> }
 
 export default async function PostsPage({ searchParams }: PageProps) {
-  const { q } = await searchParams
-  const query = typeof q === 'string' ? q.trim() : ''
-  const [posts, categories, authors] = await Promise.all([
+  const params = await searchParams
+  const query = parseSearchQuery(params.q)
+  const requestedPage = parsePageQuery(params.page)
+  const [posts, categories, tags, authorLinks, showNewsletter] = await Promise.all([
     settlePublicBlog('index', () => (query ? searchPublishedPosts(query) : listPublishedPosts()), []),
     settlePublicBlog('categories', () => listCategoryLinks(), []),
+    settlePublicBlog('tags', () => listTagLinks(), []),
     settlePublicBlog('authors', () => listAuthorLinks(), []),
+    settlePublicBlog('newsletter', () => newsletterBlockAvailable(), false),
   ])
+  const rollAuthors = await settlePublicBlog(
+    'roll authors',
+    () => authorsForUserIds(posts.flatMap((post) => (post.author_id ? [post.author_id] : []))),
+    {}
+  )
+  const paged = paginate(posts, requestedPage)
+  const lead = !query && paged.page === 1 ? (paged.items[0] ?? null) : null
+  const cards = lead ? paged.items.slice(1) : paged.items
+  const empty = query ? 'No posts match that search.' : 'No posts yet.'
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h1 className="text-4xl font-bold text-gray-900">Posts</h1>
-        <p className="mt-4 text-lg text-gray-600">Published writing from this site.</p>
-        <form action="/posts" method="get" className="mt-8 flex gap-2">
-          <label htmlFor="post-search" className="sr-only">
-            Search posts
-          </label>
-          <input
-            id="post-search"
-            name="q"
-            defaultValue={query}
-            placeholder="Search titles and summaries"
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+    <PostsPageFrame width="6xl">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="order-2 min-w-0 space-y-8 lg:order-1">
+          <header>
+            <h1 className="text-4xl font-bold text-gray-900">Posts</h1>
+            <p className="mt-4 text-lg text-gray-600">Published writing from this site.</p>
+          </header>
+          <SearchForm query={query} />
+          {query ? (
+            <p className="text-sm text-gray-600">
+              Results for “{query}”.{' '}
+              <Link href="/posts" className="text-primary-700 hover:underline">
+                Clear search
+              </Link>
+            </p>
+          ) : null}
+          {lead ? (
+            <FeaturedPost
+              post={lead}
+              author={lead.author_id ? (rollAuthors[lead.author_id] ?? null) : null}
+            />
+          ) : null}
+          <PublishedPostList posts={cards} authors={rollAuthors} empty={lead ? '' : empty} />
+          <PostsPagination pathname="/posts" query={query} page={paged.page} pageCount={paged.pageCount} />
+        </div>
+        <div className="order-1 lg:order-2">
+          <PostsSidebar
+            categories={categories}
+            tags={tags}
+            authors={authorLinks}
+            showNewsletter={showNewsletter}
           />
-          <button type="submit" className="rounded-md bg-gray-900 px-4 py-2 text-sm text-white">
-            Search
-          </button>
-        </form>
-        {query ? (
-          <p className="mt-4 text-sm text-gray-600">
-            Results for “{query}”. <Link href="/posts" className="underline">Clear</Link>
-          </p>
-        ) : null}
-        {categories.length > 0 ? (
-          <nav className="mt-6 flex flex-wrap gap-2 text-sm" aria-label="Categories">
-            {categories.map((category) => (
-              <Link
-                key={category.slug}
-                href={`/posts/category/${category.slug}`}
-                className="rounded-full bg-white px-3 py-1 text-gray-700 ring-1 ring-gray-200 hover:text-primary-700"
-              >
-                {category.name}
-              </Link>
-            ))}
-          </nav>
-        ) : null}
-        {authors.length > 0 ? (
-          <nav className="mt-4 flex flex-wrap gap-3 text-sm" aria-label="Authors">
-            {authors.map((author) => (
-              <Link key={author.slug} href={`/posts/author/${author.slug}`} className="text-gray-600 hover:underline">
-                {author.name}
-              </Link>
-            ))}
-          </nav>
-        ) : null}
-        <PublishedPostList posts={posts} />
-        <NewsletterForm />
+        </div>
       </div>
-    </div>
+    </PostsPageFrame>
   )
 }
