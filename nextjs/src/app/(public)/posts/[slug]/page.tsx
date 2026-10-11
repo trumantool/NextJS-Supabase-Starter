@@ -3,7 +3,10 @@ import { notFound } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import Link from 'next/link'
 import { CommentForm } from '@/components/posts/CommentForm'
+import { PostCoverImage } from '@/components/posts/PostCoverImage'
+import { PostsPageFrame } from '@/components/posts/PostsPageFrame'
 import { listVisibleComments } from '@/lib/blog-comments'
+import { authorByline, coverAltText, formatPostDate, postReadingMinutes } from '@/lib/blog-roll'
 import { loadPublishedArticle } from '@/lib/blog-taxonomy'
 import { articleJsonLd, postCanonical, publicSiteOrigin } from '@/lib/blog-seo'
 import { settlePublicBlog } from '@/lib/posts'
@@ -55,19 +58,36 @@ export default async function PostPage({ params }: PageProps) {
   } = await supabase.auth.getUser()
   const comments = await settlePublicBlog('comments', () => listVisibleComments(post.id), [])
 
+  const role = author ? authorByline(author.title, author.company) : null
+  const date = formatPostDate(post.published_at)
+  const minutes = postReadingMinutes(post.summary, post.body)
+
   return (
-    <div className="min-h-screen bg-gray-50 pt-20">
+    <PostsPageFrame>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <article className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <Link href="/posts" className="text-sm text-gray-600 hover:underline">
+      <article className="[overflow-wrap:anywhere]">
+        <Link href="/posts" className="text-sm text-primary-700 hover:underline">
           All posts
         </Link>
         <h1 className="mt-6 text-4xl font-bold text-gray-900">{post.title}</h1>
-        {author ? (
-          <p className="mt-3 text-sm text-gray-600">
-            <Link href={`/posts/author/${author.slug}`} className="hover:underline">
-              {author.display_name}
-            </Link>
+        {date || author || minutes ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            {date ? <time dateTime={post.published_at ?? undefined}>{date}</time> : null}
+            {author ? (
+              <>
+                {date ? ' · ' : null}
+                <Link href={`/posts/author/${author.slug}`} className="text-primary-700 hover:underline">
+                  {author.display_name}
+                </Link>
+                {role ? <>, {role}</> : null}
+              </>
+            ) : null}
+            {minutes ? (
+              <>
+                {date || author ? ' · ' : null}
+                {minutes} min read
+              </>
+            ) : null}
           </p>
         ) : null}
         {post.summary ? <p className="mt-4 text-xl text-gray-600">{post.summary}</p> : null}
@@ -83,17 +103,22 @@ export default async function PostPage({ params }: PageProps) {
               </Link>
             ))}
             {tags.map((tag) => (
-              <Link key={tag.slug} href={`/posts/tag/${tag.slug}`} className="text-gray-600 hover:underline">
+              <Link key={tag.slug} href={`/posts/tag/${tag.slug}`} className="text-primary-700 hover:underline">
                 {tag.name}
               </Link>
             ))}
           </div>
         ) : null}
         {post.cover_image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={post.cover_image_url} alt="" className="mt-8 w-full rounded-lg" />
+          <div className="mt-8 overflow-hidden rounded-lg">
+            <PostCoverImage
+              src={post.cover_image_url}
+              alt={coverAltText(post.cover_image_alt, post.title)}
+              priority
+            />
+          </div>
         ) : null}
-        <div className="prose prose-gray mt-8 max-w-none">
+        <div className="prose prose-gray mt-8 max-w-none [overflow-wrap:anywhere]">
           <ReactMarkdown>{post.body ?? ''}</ReactMarkdown>
         </div>
         {post.video_url ? (
@@ -143,6 +168,6 @@ export default async function PostPage({ params }: PageProps) {
           )}
         </section>
       </article>
-    </div>
+    </PostsPageFrame>
   )
 }

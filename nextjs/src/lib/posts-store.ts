@@ -167,11 +167,36 @@ export type PublishedPost = {
   summary: string | null
   body: string | null
   cover_image_url: string | null
+  /** Absent until cover_image_alt exists. A missing column is stored as null. */
+  cover_image_alt?: string | null
   video_url: string | null
   published_at: string | null
   sort_order: number | null
   author_id: string | null
   updated_at: string
+}
+
+type PostQueryError = { code?: string; message: string } | null
+
+function attachCoverAlt(row: PublishedPost): PublishedPost {
+  const alt = (row as PublishedPost & { cover_image_alt?: unknown }).cover_image_alt
+  return { ...row, cover_image_alt: typeof alt === 'string' && alt.trim() ? alt : null }
+}
+
+/**
+ * Try the cover alt column, then the stable public column list.
+ * A shared database without cover_image_alt still returns the posts.
+ */
+async function selectWithCoverAlt(
+  label: string,
+  run: (columns: string) => Promise<{ data: PublishedPost[] | null; error: PostQueryError }>
+): Promise<PublishedPost[]> {
+  const wide = await run(`${PUBLIC_COLUMNS}, cover_image_alt`)
+  if (!wide.error) return (wide.data ?? []).map(attachCoverAlt)
+  if (!isMissingBlogSchemaError(wide.error)) return rowsOrEmpty(wide.error, wide.data, label)
+  logBlogSchemaGap('posts.cover_image_alt', wide.error)
+  const narrow = await run(PUBLIC_COLUMNS)
+  return rowsOrEmpty(narrow.error, narrow.data, label).map((row) => ({ ...row, cover_image_alt: null }))
 }
 
 function liveNow(): string {
@@ -182,32 +207,81 @@ export async function listPublishedPosts(): Promise<PublishedPost[]> {
   const website = readPublicWebsite()
   if (!website) return []
   const supabase = await createSSRClient()
-  const { data, error } = await supabase
-    .from('posts')
-    .select(PUBLIC_COLUMNS)
-    .eq('website', website)
-    .eq('type', BLOG_TYPE)
-    .eq('status', 'published')
-    .lte('published_at', liveNow())
-    .order('sort_order', { ascending: true })
-    .order('published_at', { ascending: false })
-  return rowsOrEmpty(error, data as PublishedPost[] | null, 'published posts')
+  return selectWithCoverAlt('published posts', async (columns) => {
+    const { data, error } = await supabase
+      .from('posts')
+      .select(columns as typeof PUBLIC_COLUMNS)
+      .eq('website', website)
+      .eq('type', BLOG_TYPE)
+      .eq('status', 'published')
+      .lte('published_at', liveNow())
+      .order('sort_order', { ascending: true })
+      .order('published_at', { ascending: false })
+    return { data: (data as PublishedPost[] | null) ?? null, error }
+  })
 }
 
 export async function getPublishedPostBySlug(slug: string): Promise<PublishedPost | null> {
   const website = readPublicWebsite()
   if (!website) return null
   const supabase = await createSSRClient()
-  const { data, error } = await supabase
-    .from('posts')
-    .select(PUBLIC_COLUMNS)
-    .eq('website', website)
-    .eq('type', BLOG_TYPE)
-    .eq('status', 'published')
-    .lte('published_at', liveNow())
-    .eq('slug', slug)
-    .maybeSingle()
-  return rowOrEmpty(error, (data as PublishedPost | null) ?? null, 'published post')
+  const run = async (columns: string) => {
+    const { data, error } = await supabase
+      .from('posts')
+      .select(columns as typeof PUBLIC_COLUMNS)
+      .eq('website', website)
+      .eq('type', BLOG_TYPE)
+      .eq('status', 'published')
+      .lte('published_at', liveNow())
+      .eq('slug', slug)
+      .maybeSingle()
+    return { data: (data as PublishedPost | null) ?? null, error }
+  }
+  let result = await run(`${PUBLIC_COLUMNS}, cover_image_alt`)
+  if (result.error && isMissingBlogSchemaError(result.error)) {
+    logBlogSchemaGap('posts.cover_image_alt', result.error)
+    result = await run(PUBLIC_COLUMNS)
+  }
+  const row = rowOrEmpty(result.error, result.data, 'published post')
+  if (!row) return null
+  return attachCoverAlt(row)
+}
+
+export async function listPublishedPostsByIds(ids: string[]): Promise<PublishedPost[]> {
+  if (ids.length === 0) return []
+  const website = readPublicWebsite()
+  if (!website) return []
+  const supabase = await createSSRClient()
+  return selectWithCoverAlt('published posts by id', async (columns) => {
+    const { data, error } = await supabase
+      .from('posts')
+      .select(columns as typeof PUBLIC_COLUMNS)
+      .eq('website', website)
+      .eq('type', BLOG_TYPE)
+      .eq('status', 'published')
+      .lte('published_at', liveNow())
+      .in('id', ids)
+      .order('published_at', { ascending: false })
+    return { data: (data as PublishedPost[] | null) ?? null, error }
+  })
+}
+
+export async function listPublishedPostsForAuthor(authorId: string): Promise<PublishedPost[]> {
+  const website = readPublicWebsite()
+  if (!website) return []
+  const supabase = await createSSRClient()
+  return selectWithCoverAlt('published posts by author', async (columns) => {
+    const { data, error } = await supabase
+      .from('posts')
+      .select(columns as typeof PUBLIC_COLUMNS)
+      .eq('website', website)
+      .eq('type', BLOG_TYPE)
+      .eq('status', 'published')
+      .eq('author_id', authorId)
+      .lte('published_at', liveNow())
+      .order('published_at', { ascending: false })
+    return { data: (data as PublishedPost[] | null) ?? null, error }
+  })
 }
 
 export async function searchPublishedPosts(query: string): Promise<PublishedPost[]> {
@@ -216,16 +290,18 @@ export async function searchPublishedPosts(query: string): Promise<PublishedPost
   const pattern = ilikeContainsPattern(query.trim())
   const quoted = `"${pattern.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
   const supabase = await createSSRClient()
-  const { data, error } = await supabase
-    .from('posts')
-    .select(PUBLIC_COLUMNS)
-    .eq('website', website)
-    .eq('type', BLOG_TYPE)
-    .eq('status', 'published')
-    .lte('published_at', liveNow())
-    .or(`title.ilike.${quoted},summary.ilike.${quoted}`)
-    .limit(20)
-  return rowsOrEmpty(error, data as PublishedPost[] | null, 'post search')
+  return selectWithCoverAlt('post search', async (columns) => {
+    const { data, error } = await supabase
+      .from('posts')
+      .select(columns as typeof PUBLIC_COLUMNS)
+      .eq('website', website)
+      .eq('type', BLOG_TYPE)
+      .eq('status', 'published')
+      .lte('published_at', liveNow())
+      .or(`title.ilike.${quoted},summary.ilike.${quoted}`)
+      .order('published_at', { ascending: false })
+    return { data: (data as PublishedPost[] | null) ?? null, error }
+  })
 }
 
 export async function getMyPost(id: string): Promise<Post> {

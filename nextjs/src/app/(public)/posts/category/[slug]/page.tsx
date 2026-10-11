@@ -1,12 +1,18 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PublishedPostList } from '@/components/posts/PublishedPostList'
-import { listPostsForCategory } from '@/lib/blog-taxonomy'
+import { PostsPageFrame } from '@/components/posts/PostsPageFrame'
+import { PostsPagination } from '@/components/posts/PostsPagination'
+import { paginate, parsePageQuery } from '@/lib/blog-roll'
+import { authorsForUserIds, listPostsForCategory } from '@/lib/blog-taxonomy'
 import { settlePublicBlog } from '@/lib/posts'
 
 export const dynamic = 'force-dynamic'
 
-type PageProps = { params: Promise<{ slug: string }> }
+type PageProps = {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ page?: string | string[] }>
+}
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params
@@ -15,20 +21,28 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: result.name, description: `Posts in ${result.name}` }
 }
 
-export default async function CategoryPage({ params }: PageProps) {
+export default async function CategoryPage({ params, searchParams }: PageProps) {
   const { slug } = await params
+  const query = await searchParams
   const result = await settlePublicBlog('category', () => listPostsForCategory(slug), null)
   if (!result) notFound()
+  const paged = paginate(result.posts, parsePageQuery(query.page))
+  const authors = await settlePublicBlog(
+    'category authors',
+    () => authorsForUserIds(paged.items.flatMap((post) => (post.author_id ? [post.author_id] : []))),
+    {}
+  )
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <Link href="/posts" className="text-sm text-gray-600 hover:underline">
-          All posts
-        </Link>
-        <h1 className="mt-6 text-4xl font-bold text-gray-900">{result.name}</h1>
-        <PublishedPostList posts={result.posts} />
+    <PostsPageFrame>
+      <Link href="/posts" className="text-sm text-primary-700 hover:underline">
+        All posts
+      </Link>
+      <h1 className="mt-6 text-4xl font-bold text-gray-900">{result.name}</h1>
+      <div className="mt-8">
+        <PublishedPostList posts={paged.items} authors={authors} empty="No posts in this category yet." />
       </div>
-    </div>
+      <PostsPagination pathname={`/posts/category/${slug}`} page={paged.page} pageCount={paged.pageCount} />
+    </PostsPageFrame>
   )
 }

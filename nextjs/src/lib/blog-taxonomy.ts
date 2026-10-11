@@ -7,16 +7,72 @@ import {
   publicPostWebsite,
   slugifyTitle,
 } from '@/lib/posts'
+import type { RollAuthor } from '@/lib/blog-roll'
 import {
-  PUBLIC_COLUMNS,
   getPublishedPostBySlug,
   listPublishedPosts,
+  listPublishedPostsByIds,
+  listPublishedPostsForAuthor,
   type PublishedPost,
 } from '@/lib/posts-store'
 
 export type TermLink = { slug: string; name: string }
 
-export type AuthorLink = { slug: string; display_name: string; bio: string | null }
+export type AuthorLink = {
+  slug: string
+  display_name: string
+  bio: string | null
+  title: string | null
+  company: string | null
+  location: string | null
+  linkedin_url: string | null
+}
+
+const AUTHOR_COLUMN_ATTEMPTS = [
+  'user_id, slug, display_name, bio, linkedin_url, title, company, location',
+  'user_id, slug, display_name, bio, linkedin_url',
+  'user_id, slug, display_name, bio',
+] as const
+
+type AuthorProfileRow = {
+  user_id: string
+  slug: string
+  display_name: string
+  bio: string | null
+  linkedin_url?: string | null
+  title?: string | null
+  company?: string | null
+  location?: string | null
+}
+
+function toAuthorLink(row: AuthorProfileRow): AuthorLink {
+  return {
+    slug: row.slug,
+    display_name: row.display_name,
+    bio: row.bio,
+    title: row.title ?? null,
+    company: row.company ?? null,
+    location: row.location ?? null,
+    linkedin_url: row.linkedin_url ?? null,
+  }
+}
+
+async function selectAuthorRows(
+  label: string,
+  run: (columns: string) => Promise<{ data: AuthorProfileRow[] | null; error: { code?: string; message: string } | null }>
+): Promise<AuthorProfileRow[] | null> {
+  for (let index = 0; index < AUTHOR_COLUMN_ATTEMPTS.length; index += 1) {
+    const result = await run(AUTHOR_COLUMN_ATTEMPTS[index])
+    if (!result.error) return result.data ?? []
+    const last = index === AUTHOR_COLUMN_ATTEMPTS.length - 1
+    if (!isMissingBlogSchemaError(result.error) || last) {
+      const missing = emptyOnSchemaError(result.error, [] as AuthorProfileRow[], label)
+      return missing ?? null
+    }
+    logBlogSchemaGap(label, result.error)
+  }
+  return []
+}
 
 function readPublicWebsite(): PostWebsite | null {
   return publicPostWebsite(process.env.POSTS_WEBSITE)
@@ -247,22 +303,7 @@ export async function getPostTermNames(postId: string): Promise<{ categories: st
 }
 
 async function livePostsByIds(ids: string[]): Promise<PublishedPost[]> {
-  if (ids.length === 0) return []
-  const website = readPublicWebsite()
-  if (!website) return []
-  const supabase = await createSSRClient()
-  const { data, error } = await supabase
-    .from('posts')
-    .select(PUBLIC_COLUMNS)
-    .eq('website', website)
-    .eq('type', 'blog')
-    .eq('status', 'published')
-    .lte('published_at', new Date().toISOString())
-    .in('id', ids)
-    .order('published_at', { ascending: false })
-  const missing = emptyOnSchemaError(error, [] as PublishedPost[], 'posts')
-  if (missing) return missing
-  return (data ?? []) as PublishedPost[]
+  return listPublishedPostsByIds(ids)
 }
 
 export async function listPostsForCategory(slug: string): Promise<{ name: string; posts: PublishedPost[] } | null> {
@@ -317,29 +358,19 @@ export async function listPostsForAuthor(
   const website = readPublicWebsite()
   if (!website) return null
   const supabase = await createSSRClient()
-  const { data: author, error } = await supabase
-    .from('blog_author_profiles')
-    .select('user_id, slug, display_name, bio')
-    .eq('website', website)
-    .eq('slug', slug)
-    .maybeSingle()
-  const missing = emptyOnSchemaError(error, null, 'blog_author_profiles')
-  if (missing !== undefined) return missing
+  const rows = await selectAuthorRows('blog_author_profiles', async (columns) => {
+    const { data, error } = await supabase
+      .from('blog_author_profiles')
+      .select(columns as 'user_id, slug, display_name, bio')
+      .eq('website', website)
+      .eq('slug', slug)
+      .maybeSingle()
+    return { data: data ? [data as AuthorProfileRow] : [], error }
+  })
+  const author = rows?.[0]
   if (!author) return null
-  const { data, error: postError } = await supabase
-    .from('posts')
-    .select(PUBLIC_COLUMNS)
-    .eq('website', website)
-    .eq('type', 'blog')
-    .eq('status', 'published')
-    .eq('author_id', author.user_id)
-    .lte('published_at', new Date().toISOString())
-    .order('published_at', { ascending: false })
-  const posts = emptyOnSchemaError(postError, [] as PublishedPost[], 'posts') ?? ((data ?? []) as PublishedPost[])
-  return {
-    author: { slug: author.slug, display_name: author.display_name, bio: author.bio },
-    posts,
-  }
+  const posts = await listPublishedPostsForAuthor(author.user_id)
+  return { author: toAuthorLink(author), posts }
 }
 
 export async function listCategoryLinks(): Promise<TermLink[]> {
@@ -354,6 +385,64 @@ export async function listCategoryLinks(): Promise<TermLink[]> {
   const missing = emptyOnSchemaError(error, [] as TermLink[], 'blog_categories')
   if (missing) return missing
   return data ?? []
+}
+
+export async function listTagLinks(): Promise<TermLink[]> {
+  const website = readPublicWebsite()
+  if (!website) return []
+  const supabase = await createSSRClient()
+  const { data, error } = await supabase
+    .from('blog_tags')
+    .select('slug, name')
+    .eq('website', website)
+    .order('name', { ascending: true })
+  const missing = emptyOnSchemaError(error, [] as TermLink[], 'blog_tags')
+  if (missing) return missing
+  return data ?? []
+}
+
+export async function authorsForUserIds(userIds: string[]): Promise<Record<string, RollAuthor>> {
+  const unique = [...new Set(userIds.filter((id) => id.length > 0))]
+  if (unique.length === 0) return {}
+  const website = readPublicWebsite()
+  if (!website) return {}
+  const supabase = await createSSRClient()
+  const rows = await selectAuthorRows('blog_author_profiles', async (columns) => {
+    const { data, error } = await supabase
+      .from('blog_author_profiles')
+      .select(columns as 'user_id, slug, display_name, bio')
+      .eq('website', website)
+      .in('user_id', unique)
+    return { data: (data as AuthorProfileRow[] | null) ?? [], error }
+  })
+  const map: Record<string, RollAuthor> = {}
+  for (const row of rows ?? []) {
+    map[row.user_id] = {
+      slug: row.slug,
+      displayName: row.display_name,
+      title: row.title ?? null,
+      company: row.company ?? null,
+    }
+  }
+  return map
+}
+
+export async function newsletterBlockAvailable(): Promise<boolean> {
+  try {
+    const { createServerAdminClient } = await import('@/lib/supabase/serverAdminClient')
+    const admin = await createServerAdminClient()
+    const { error } = await admin.from('newsletter_subscribers').select('email').limit(1)
+    if (!error) return true
+    if (isMissingBlogSchemaError(error)) {
+      logBlogSchemaGap('newsletter_subscribers', error)
+      return false
+    }
+    console.warn(`newsletter probe: ${error.code ?? ''} ${error.message}`.trim())
+    return false
+  } catch (error) {
+    console.warn('newsletter probe:', error instanceof Error ? error.message : error)
+    return false
+  }
 }
 
 export async function listAuthorLinks(): Promise<TermLink[]> {
@@ -404,16 +493,17 @@ export async function authorForPost(authorId: string | null): Promise<AuthorLink
   const website = readPublicWebsite()
   if (!website) return null
   const supabase = await createSSRClient()
-  const { data, error } = await supabase
-    .from('blog_author_profiles')
-    .select('slug, display_name, bio')
-    .eq('website', website)
-    .eq('user_id', authorId)
-    .maybeSingle()
-  const missing = emptyOnSchemaError(error, null, 'blog_author_profiles')
-  if (missing !== undefined) return missing
-  if (!data) return null
-  return data
+  const rows = await selectAuthorRows('blog_author_profiles', async (columns) => {
+    const { data, error } = await supabase
+      .from('blog_author_profiles')
+      .select(columns as 'user_id, slug, display_name, bio')
+      .eq('website', website)
+      .eq('user_id', authorId)
+      .maybeSingle()
+    return { data: data ? [data as AuthorProfileRow] : [], error }
+  })
+  const row = rows?.[0]
+  return row ? toAuthorLink(row) : null
 }
 
 export async function listRelatedPosts(postId: string): Promise<PublishedPost[]> {
