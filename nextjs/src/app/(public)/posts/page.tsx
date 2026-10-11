@@ -48,7 +48,7 @@ export default async function PostsPage({ searchParams }: PageProps) {
   return (
     <PostsPageFrame width="6xl">
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="order-2 min-w-0 space-y-8 lg:order-1">
+        <div className="min-w-0 space-y-8">
           <header>
             <h1 className="text-4xl font-bold text-gray-900">Blog</h1>
             <p className="mt-4 text-lg text-gray-600">Published writing from this site.</p>
@@ -71,14 +71,12 @@ export default async function PostsPage({ searchParams }: PageProps) {
           <PublishedPostList posts={cards} authors={rollAuthors} empty={lead ? '' : empty} />
           <PostsPagination pathname="/posts" query={query} page={paged.page} pageCount={paged.pageCount} />
         </div>
-        <div className="order-1 lg:order-2">
-          <PostsSidebar
-            categories={categories}
-            tags={tags}
-            authors={authorLinks}
-            showNewsletter={showNewsletter}
-          />
-        </div>
+        <PostsSidebar
+          categories={categories}
+          tags={tags}
+          authors={authorLinks}
+          showNewsletter={showNewsletter}
+        />
       </div>
     </PostsPageFrame>
   )

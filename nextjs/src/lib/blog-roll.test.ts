@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   BLOG_ROLL_PAGE_SIZE,
   authorByline,
@@ -130,5 +133,26 @@ describe('cover image hosts', () => {
     )
     assert.equal(isOptimizableCover('https://example.com/a.jpg'), false)
     assert.equal(isOptimizableCover('not a url'), false)
+  })
+})
+
+describe('blog roll source order', () => {
+  it('puts the heading, search, posts, and pagination before the sidebar', () => {
+    const page = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../app/(public)/posts/page.tsx'),
+      'utf8'
+    )
+    assert.equal(/\border-\d/.test(page), false)
+    const heading = page.indexOf('>Blog<')
+    const search = page.indexOf('<SearchForm')
+    const list = page.indexOf('<PublishedPostList')
+    const pagination = page.indexOf('<PostsPagination')
+    const sidebar = page.indexOf('<PostsSidebar')
+    assert.ok(heading >= 0)
+    assert.ok(search > heading)
+    assert.ok(list > search)
+    assert.ok(pagination > list)
+    assert.ok(sidebar > pagination)
+    assert.match(page, /lg:grid-cols-\[minmax\(0,1fr\)_18rem\]/)
   })
 })
