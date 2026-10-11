@@ -7,7 +7,7 @@ export default function PostsError({ reset }: { error: Error; reset: () => void 
   return (
     <div className={POSTS_PAGE_FRAME}>
       <div className="mx-auto max-w-3xl px-4 py-12">
-        <h1 className="text-2xl font-semibold text-gray-900">Posts could not be loaded.</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Blog could not be loaded.</h1>
         <Button type="button" variant="outline" onClick={reset} className="mt-4">
           Try again
         </Button>

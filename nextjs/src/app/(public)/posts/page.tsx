@@ -18,7 +18,7 @@ import { listPublishedPosts, searchPublishedPosts } from '@/lib/posts-store'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Posts',
+  title: 'Blog',
   description: 'Published posts.',
 }
 
@@ -50,7 +50,7 @@ export default async function PostsPage({ searchParams }: PageProps) {
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="order-2 min-w-0 space-y-8 lg:order-1">
           <header>
-            <h1 className="text-4xl font-bold text-gray-900">Posts</h1>
+            <h1 className="text-4xl font-bold text-gray-900">Blog</h1>
             <p className="mt-4 text-lg text-gray-600">Published writing from this site.</p>
           </header>
           <SearchForm query={query} />
