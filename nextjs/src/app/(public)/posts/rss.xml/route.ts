@@ -24,7 +24,7 @@ export async function GET() {
     })
     .join('')
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Posts</title><link>${xmlEscape(
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Blog</title><link>${xmlEscape(
     `${origin}/posts`
   )}</link><description>Published posts</description>${items}</channel></rss>`
 
