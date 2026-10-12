@@ -11,7 +11,6 @@ import {
     User,
     Bot,
     BookOpen,
-    LayoutTemplate,
     MessageSquare,
     CalendarClock,
     Settings,
@@ -146,19 +145,6 @@ export default function DashboardContent() {
                             <div>
                                 <h3 className="font-medium">Skills</h3>
                                 <p className="text-sm text-gray-500">Shared and personal skill files</p>
-                            </div>
-                        </Link>
-
-                        <Link
-                            href="/agent-templates"
-                            className="flex items-center gap-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-primary-50 rounded-full">
-                                <LayoutTemplate className="h-4 w-4 text-primary-600" />
-                            </div>
-                            <div>
-                                <h3 className="font-medium">Templates</h3>
-                                <p className="text-sm text-gray-500">Clone a starter recipe</p>
                             </div>
                         </Link>
 

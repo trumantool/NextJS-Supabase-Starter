@@ -63,7 +63,7 @@ export default function Home() {
       icon: Bot,
       title: 'Agents and skills',
       description:
-        'Upload skill markdown, browse a generic starter template, and clone user agents.',
+        'Upload skill markdown and assign it to General agent or Task Management. Plain General chat does not load those skills.',
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',
     },
@@ -87,7 +87,7 @@ export default function Home() {
       icon: Settings,
       title: 'User and admin settings',
       description:
-        'Profile, password, and MFA for users. Site title, support details, AI Docs model, and agent templates for admins.',
+        'Profile, password, and MFA for users. Site title, support details, and the AI Docs model for admins.',
       color: 'text-rose-600',
       bg: 'bg-rose-50',
     },

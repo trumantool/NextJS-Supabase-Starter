@@ -49,7 +49,6 @@ export async function updateSession(request: NextRequest) {
         '/chat',
         '/agents',
         '/agent-skills',
-        '/agent-templates',
         '/automations',
         '/my-posts',
     ]

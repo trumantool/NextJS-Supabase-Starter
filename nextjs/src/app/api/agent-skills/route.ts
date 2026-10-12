@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { listBuiltinSkills } from '@/lib/builtin-agents'
+import { isSkillRowVisible } from '@/lib/starter-catalog-allowlist'
 import { createSSRClient } from '@/lib/supabase/server'
 
 export type AgentSkillListItem = {
@@ -10,7 +12,8 @@ export type AgentSkillListItem = {
 
 /**
  * GET /api/agent-skills
- * Own + shared skills (RLS). Shared first, then mine, by name.
+ * Personal skills for the caller, plus built-in Task Management file descriptors.
+ * Shared database rows stay hidden. Builtin files are not fake uuids.
  */
 export async function GET() {
   try {
@@ -33,14 +36,11 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to list skills' }, { status: 500 })
     }
 
-    const skills: AgentSkillListItem[] = [...(data || [])].toSorted((a, b) => {
-      const aShared = a.user_id == null ? 0 : 1
-      const bShared = b.user_id == null ? 0 : 1
-      if (aShared !== bShared) return aShared - bShared
-      return a.skill_name.localeCompare(b.skill_name)
-    })
+    const skills: AgentSkillListItem[] = (data || [])
+      .filter((row) => isSkillRowVisible(row, user.id))
+      .toSorted((a, b) => a.skill_name.localeCompare(b.skill_name))
 
-    return NextResponse.json({ skills })
+    return NextResponse.json({ skills, builtinSkills: listBuiltinSkills() })
   } catch (err) {
     console.error('Agent skills GET error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

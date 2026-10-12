@@ -9,7 +9,7 @@ import {
     X,
     ChevronDown,
     LogOut,
-    Key,     Files, LucideListTodo, FileText, Settings, ShieldCheck,     Bot, BookOpen, LayoutTemplate, MessageSquare, CalendarClock, Newspaper,
+    Key,     Files, LucideListTodo, FileText, Settings, ShieldCheck,     Bot, BookOpen, MessageSquare, CalendarClock, Newspaper,
 } from 'lucide-react';
 import { useGlobal } from "@/lib/context/GlobalContext";
 import { createSPASassClient } from "@/lib/supabase/client";
@@ -53,7 +53,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { name: 'Chat', href: '/chat', icon: MessageSquare },
         { name: 'Agents', href: '/agents', icon: Bot },
         { name: 'Skills', href: '/agent-skills', icon: BookOpen },
-        { name: 'Templates', href: '/agent-templates', icon: LayoutTemplate },
         { name: 'Automations', href: '/automations', icon: CalendarClock },
         { name: 'Posts', href: '/my-posts', icon: Newspaper },
         { name: 'User Settings', href: '/user-settings', icon: User },
@@ -64,7 +63,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         ? [
             { name: 'Admin Settings', href: '/admin', icon: Settings },
             { name: 'Blog', href: '/admin/blog', icon: Newspaper },
-            { name: 'Agent Templates', href: '/admin?tab=templates', icon: LayoutTemplate },
           ]
         : [];
 

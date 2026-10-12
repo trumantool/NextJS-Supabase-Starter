@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { defaultsKeepingBuiltinKey } from '@/lib/builtin-agents'
 import { isUuid } from '@/lib/ids'
 import { createSSRClient } from '@/lib/supabase/server'
 import { assertSkillIdsVisible } from '@/lib/agent-templates'
 import { deleteAgentMemoryPrefix } from '@/lib/agent-memory'
+import { builtinKeyFromDefaults, isUserAgentVisible } from '@/lib/starter-catalog-allowlist'
 import {
   parseAgentName,
   parseCloneAgentOverrides,
@@ -37,7 +39,7 @@ async function requireOwnedAgent(id: string) {
     console.error('Failed to fetch user agent:', error)
     return { error: NextResponse.json({ error: 'Failed to fetch agent' }, { status: 500 }) }
   }
-  if (!data) {
+  if (!data || !isUserAgentVisible(data)) {
     return { error: NextResponse.json({ error: 'Agent not found' }, { status: 404 }) }
   }
   return { supabase, user, agent: data }
@@ -103,13 +105,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         if (fallback.error || !fallback.defaults) {
           return NextResponse.json({ error: fallback.error || 'Invalid defaults.' }, { status: 400 })
         }
-        patch.defaults = fallback.defaults as Json
+        patch.defaults = defaultsKeepingBuiltinKey(loaded.agent.defaults, fallback.defaults) as Json
       } else {
         const current =
           loaded.agent.defaults && typeof loaded.agent.defaults === 'object' && !Array.isArray(loaded.agent.defaults)
             ? loaded.agent.defaults
             : {}
-        patch.defaults = { ...current, ...defaults.overrides.defaults } as Json
+        patch.defaults = defaultsKeepingBuiltinKey(
+          loaded.agent.defaults,
+          { ...current, ...defaults.overrides.defaults }
+        ) as Json
       }
     }
 
@@ -157,6 +162,13 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     const { id } = await context.params
     const loaded = await requireOwnedAgent(id)
     if ('error' in loaded) return loaded.error
+
+    if (builtinKeyFromDefaults(loaded.agent.defaults)) {
+      return NextResponse.json(
+        { error: 'Built-in agents cannot be deleted. Remove skills from the agent instead.' },
+        { status: 400 }
+      )
+    }
 
     const { error } = await loaded.supabase
       .from('user_agents')
