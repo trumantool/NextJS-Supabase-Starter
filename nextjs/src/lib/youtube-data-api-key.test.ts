@@ -45,7 +45,7 @@ describe('public admin settings', () => {
   it('seeds an empty secret and conflicts on (app_key, option_name)', () => {
     const schema = readFileSync(join(root, 'supabase/schema.sql'), 'utf8')
     const migration = readFileSync(
-      join(root, 'supabase/migrations/20261013120000_admin_setting_youtube_data_api_key.sql'),
+      join(root, 'supabase/migrations/20261013123000_admin_setting_youtube_data_api_key.sql'),
       'utf8'
     )
 

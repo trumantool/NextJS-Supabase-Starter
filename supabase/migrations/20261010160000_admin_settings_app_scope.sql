@@ -1,5 +1,5 @@
 -- Scope admin_settings per deployment and hide password rows from anon SELECT.
--- The YouTube Data API key seed (20261013120000) runs after this file and
+-- The YouTube Data API key seed (20261013123000) runs after this file and
 -- uses ON CONFLICT (app_key, option_name), the unique key created here.
 -- Must not be applied to the shared production database glplvrljdgowcwuubkau.
 --
