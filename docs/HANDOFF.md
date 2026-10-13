@@ -102,8 +102,8 @@ Implementation of that plan, stacked and ready for review, not merged:
 
 Later, stacked on current `main` after that cleanup:
 
-5. Blog editor parity with marketing-agent #150. Base: `main`. Branch `cursor/blog-parity-150-0998`.
-6. Legal shortcodes, the unapplied posts/legal migration, and this handoff update. Base: the blog parity branch. Branch `cursor/legal-pages-sql-0998`.
+5. #30 blog editor parity with marketing-agent #150. Base: `main`. Branch `cursor/blog-parity-150-0998`.
+6. #31 legal shortcodes, the unapplied posts/legal migration, and this handoff update. Base: the #30 branch. Branch `cursor/legal-pages-sql-0998`.
 
 ## How to commit and open a PR
 
