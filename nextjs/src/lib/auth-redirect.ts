@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types'
-import { adminSettingsAppKey, filterByAdminSettingsAppKey } from '@/lib/admin-settings-scope'
+import { adminSettingsAppKey, filterByAdminSettingsAppKey } from './admin-settings-scope.ts'
 
 /** admin_settings.option_name for the post-login / auth-callback base URL. */
 export const LOGIN_REDIRECT_OPTION = 'login_redirect_url'
