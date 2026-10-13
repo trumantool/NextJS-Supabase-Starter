@@ -74,10 +74,19 @@ describe('admin_settings select policies', () => {
     }
   })
 
-  it('the new migration is later than every other migration', () => {
+  it('the provenance migration is the latest and conflicts on (app_key, option_name)', () => {
     const names = readdirSync(join(root, 'supabase/migrations')).filter((name) => name.endsWith('.sql'))
     const latest = [...names].sort().at(-1)
-    assert.equal(latest, '20261010160000_admin_settings_app_scope.sql')
+    assert.equal(latest, '20261013122000_user_data_registration_provenance.sql')
+    const provenance = read('supabase/migrations/20261013122000_user_data_registration_provenance.sql')
+    assert.match(provenance, /ON CONFLICT \(app_key, option_name\) DO NOTHING/)
+    assert.equal(provenance.includes('ON CONFLICT (option_name)'), false)
+    assert.match(provenance, /AND app_key IS NULL/)
+    assert.equal(/GRANT EXECUTE ON FUNCTION authenticative\.is_admin\(\) TO anon/.test(provenance), false)
+    const ordered = [...names].sort()
+    const scopeAt = ordered.indexOf('20261010160000_admin_settings_app_scope.sql')
+    const provenanceAt = ordered.indexOf('20261013122000_user_data_registration_provenance.sql')
+    assert.equal(scopeAt >= 0 && provenanceAt > scopeAt, true)
   })
 
   it('schema seeds stay idempotent on (app_key, option_name)', () => {
