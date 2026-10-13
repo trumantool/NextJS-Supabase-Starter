@@ -8,7 +8,9 @@ import { PostsPageFrame } from '@/components/posts/PostsPageFrame'
 import { listVisibleComments } from '@/lib/blog-comments'
 import { authorByline, coverAltText, formatPostDate, postReadingMinutes } from '@/lib/blog-roll'
 import { loadPublishedArticle } from '@/lib/blog-taxonomy'
-import { articleJsonLd, postCanonical, publicSiteOrigin } from '@/lib/blog-seo'
+import { articleJsonLd, postCanonical, postDescription, postHeadline, postSocialImage, publicSiteOrigin } from '@/lib/blog-seo'
+import { blogBodyHtml } from '@/lib/blog/render-body'
+import { youtubeNocookieSrc, youtubeVideoId } from '@/lib/blog/youtube'
 import { settlePublicBlog } from '@/lib/posts'
 import { createSSRClient } from '@/lib/supabase/server'
 
@@ -23,23 +25,26 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { post } = article
   const origin = publicSiteOrigin(process.env.NEXT_PUBLIC_SITE_ORIGIN)
   const canonical = postCanonical(origin, post.slug)
-  const images = post.cover_image_url ? [post.cover_image_url] : undefined
+  const title = postHeadline(post)
+  const description = postDescription(post) ?? undefined
+  const image = postSocialImage(post)
+  const images = image ? [image] : undefined
   return {
-    title: post.title,
-    description: post.summary ?? undefined,
+    title,
+    description,
     alternates: canonical ? { canonical } : undefined,
     openGraph: {
       type: 'article',
-      title: post.title,
-      description: post.summary ?? undefined,
+      title,
+      description,
       ...(canonical ? { url: canonical } : {}),
       publishedTime: post.published_at ?? undefined,
       images,
     },
     twitter: {
       card: images ? 'summary_large_image' : 'summary',
-      title: post.title,
-      description: post.summary ?? undefined,
+      title,
+      description,
       images,
     },
   }
@@ -61,6 +66,8 @@ export default async function PostPage({ params }: PageProps) {
   const role = author ? authorByline(author.title, author.company) : null
   const date = formatPostDate(post.published_at)
   const minutes = postReadingMinutes(post.summary, post.body)
+  const html = blogBodyHtml(post.body_doc)
+  const videoId = youtubeVideoId(post.video_url)
 
   return (
     <PostsPageFrame>
@@ -118,10 +125,28 @@ export default async function PostPage({ params }: PageProps) {
             />
           </div>
         ) : null}
-        <div className="prose prose-gray mt-8 max-w-none [overflow-wrap:anywhere]">
-          <ReactMarkdown>{post.body ?? ''}</ReactMarkdown>
-        </div>
-        {post.video_url ? (
+        {html ? (
+          <div
+            className="prose prose-gray mt-8 max-w-none [overflow-wrap:anywhere]"
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        ) : (
+          <div className="prose prose-gray mt-8 max-w-none [overflow-wrap:anywhere]">
+            <ReactMarkdown>{post.body ?? ''}</ReactMarkdown>
+          </div>
+        )}
+        {videoId ? (
+          <div className="mt-8 aspect-video w-full max-w-full overflow-hidden">
+            <iframe
+              src={youtubeNocookieSrc(videoId)}
+              title="YouTube video"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              loading="lazy"
+              className="h-full w-full max-w-full"
+            />
+          </div>
+        ) : post.video_url ? (
           <p className="mt-8">
             <a href={post.video_url} className="text-primary-700 hover:underline">
               Video
