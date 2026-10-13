@@ -190,7 +190,7 @@ Columns on `user_data` only. Routes: checkout session create, customer portal, w
 | `@paddle/*` | Already removed from `package.json`. |
 | `user_settings.name` vs first/last | Prefer first/last already on starter. |
 | Model catalog seed | Empty catalog ⇒ usage still bumps user totals but skips model aggregates / rate row behavior per function rules — decide seed list at implement time. |
-| PRs #11/#12 unstable | Coordinate merges to avoid thrash. |
+| PRs #11/#12 | Still open, each against `main` on its own. This plan does not stack on them. |
 | Live DB hold | Schema-in-repo only until Truman says apply on `cyczlgdaocwueaacqxsh`. |
 
 ## Verification / Done-when
