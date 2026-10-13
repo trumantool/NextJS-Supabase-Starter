@@ -1,6 +1,6 @@
 -- Scope admin_settings per deployment and hide password rows from anon SELECT.
--- Later than 20261010120000 so a YouTube-key seed that still uses
--- ON CONFLICT (option_name) can run first, while option_name is still unique.
+-- The YouTube Data API key seed (20261013123000) runs after this file and
+-- uses ON CONFLICT (app_key, option_name), the unique key created here.
 -- Must not be applied to the shared production database glplvrljdgowcwuubkau.
 --
 -- Additive on existing data: new column app_key is NULL. NULL is the single-app

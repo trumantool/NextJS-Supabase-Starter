@@ -74,10 +74,17 @@ describe('admin_settings select policies', () => {
     }
   })
 
-  it('the new migration is later than every other migration', () => {
+  it('the YouTube key seed is the latest migration and conflicts on (app_key, option_name)', () => {
     const names = readdirSync(join(root, 'supabase/migrations')).filter((name) => name.endsWith('.sql'))
     const latest = [...names].sort().at(-1)
-    assert.equal(latest, '20261010160000_admin_settings_app_scope.sql')
+    assert.equal(latest, '20261013123000_admin_setting_youtube_data_api_key.sql')
+    const youtube = read('supabase/migrations/20261013123000_admin_setting_youtube_data_api_key.sql')
+    assert.match(youtube, /ON CONFLICT \(app_key, option_name\) DO NOTHING/)
+    assert.equal(youtube.includes('ON CONFLICT (option_name)'), false)
+    const ordered = [...names].sort()
+    const scopeAt = ordered.indexOf('20261010160000_admin_settings_app_scope.sql')
+    const youtubeAt = ordered.indexOf('20261013123000_admin_setting_youtube_data_api_key.sql')
+    assert.equal(scopeAt >= 0 && youtubeAt > scopeAt, true)
   })
 
   it('schema seeds stay idempotent on (app_key, option_name)', () => {
