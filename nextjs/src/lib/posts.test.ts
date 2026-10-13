@@ -12,6 +12,8 @@ import {
   isPostWebsite,
   isMissingBlogSchemaError,
   isMissingBodyDocError,
+  isMissingDeletedAtError,
+  SOFT_DELETE_UNAVAILABLE,
   POSTS_WEBSITE_ERROR,
   publicPostWebsite,
   publicSlugConflictMessage,
@@ -29,7 +31,8 @@ import {
   normalizeNewsletterEmail,
   NEWSLETTER_OK,
 } from './posts.ts'
-import { articleJsonLd, publicSiteOrigin } from './blog-seo.ts'
+import { articleJsonLd, postDescription, postHeadline, postSocialImage, publicSiteOrigin } from './blog-seo.ts'
+import { youtubeNocookieSrc, youtubeVideoId } from './blog/youtube.ts'
 import { docFromBody, docToMarkdown } from './blog-doc.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -317,6 +320,82 @@ describe('public site origin', () => {
     assert.match(robots, /\/my-posts/)
     assert.equal(robots.includes("'/posts'"), false)
     assert.equal(robots.includes('"/posts"'), false)
+  })
+})
+
+describe('blog phase A', () => {
+  it('reads a youtube id and builds a nocookie embed', () => {
+    assert.equal(youtubeVideoId('dQw4w9WgXcQ'), 'dQw4w9WgXcQ')
+    assert.equal(youtubeVideoId('https://youtu.be/dQw4w9WgXcQ'), 'dQw4w9WgXcQ')
+    assert.equal(youtubeVideoId('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), 'dQw4w9WgXcQ')
+    assert.equal(youtubeVideoId('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'), 'dQw4w9WgXcQ')
+    assert.equal(youtubeVideoId('https://m.youtube.com/shorts/dQw4w9WgXcQ'), 'dQw4w9WgXcQ')
+    assert.equal(youtubeVideoId('https://example.com/watch?v=dQw4w9WgXcQ'), null)
+    assert.equal(
+      youtubeNocookieSrc('dQw4w9WgXcQ'),
+      'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'
+    )
+    const markdown = docToMarkdown({
+      type: 'doc',
+      content: [{ type: 'youtube', attrs: { videoId: 'dQw4w9WgXcQ' } }],
+    })
+    assert.equal(markdown, 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+  })
+
+  it('prefers seo fields and falls back to the post title, summary, and cover', () => {
+    const post = {
+      title: 'Hours',
+      summary: 'Payment notes',
+      seo_title: 'Office hours',
+      meta_description: 'When we are open',
+      cover_image_url: 'https://example.com/cover.jpg',
+      og_image_url: 'https://example.com/og.jpg',
+    }
+    assert.equal(postHeadline(post), 'Office hours')
+    assert.equal(postDescription(post), 'When we are open')
+    assert.equal(postSocialImage(post), 'https://example.com/og.jpg')
+    assert.equal(postHeadline({ title: 'Hours' }), 'Hours')
+    assert.equal(postDescription({ summary: 'Payment notes' }), 'Payment notes')
+    assert.equal(
+      postSocialImage({ cover_image_url: 'https://example.com/cover.jpg' }),
+      'https://example.com/cover.jpg'
+    )
+  })
+
+  it('soft-deletes and does not hard-delete when deleted_at is missing', () => {
+    assert.equal(
+      isMissingDeletedAtError({ code: '42703', message: 'column posts.deleted_at does not exist' }),
+      true
+    )
+    assert.equal(isMissingDeletedAtError({ code: 'PGRST204', message: "Could not find the 'deleted_at' column" }), true)
+    assert.equal(isMissingDeletedAtError({ code: '42703', message: 'column website does not exist' }), false)
+    assert.match(SOFT_DELETE_UNAVAILABLE, /was not deleted/)
+    const store = readFileSync(join(root, 'nextjs/src/lib/posts-store.ts'), 'utf8')
+    assert.match(store, /deleted_at/)
+    assert.match(store, /SOFT_DELETE_UNAVAILABLE/)
+    assert.equal(store.includes('.delete('), false)
+    const actions = readFileSync(join(root, 'nextjs/src/app/(dashboard)/admin/blog/actions.ts'), 'utf8')
+    assert.match(actions, /deletePost\(/)
+    assert.match(actions, /SOFT_DELETE_UNAVAILABLE/)
+    assert.equal(actions.includes('.delete('), false)
+    const page = readFileSync(join(root, 'nextjs/src/app/(dashboard)/admin/blog/page.tsx'), 'utf8')
+    assert.match(page, /deleted_at/)
+    assert.match(page, /AdminBlogPostList/)
+    const editor = readFileSync(join(root, 'nextjs/src/components/posts/PostEditor.tsx'), 'utf8')
+    assert.match(editor, /Visual/)
+    assert.match(editor, /HTML/)
+    assert.match(editor, /blogExtensions/)
+    const editPage = readFileSync(join(root, 'nextjs/src/app/(dashboard)/my-posts/[id]/page.tsx'), 'utf8')
+    assert.match(editPage, /from === 'admin'/)
+    assert.match(editPage, /\/admin\/blog/)
+    const layout = readFileSync(join(root, 'nextjs/src/components/AppLayout.tsx'), 'utf8')
+    assert.match(layout, /target="_blank"/)
+    assert.match(layout, /rel="noopener noreferrer"/)
+    assert.match(layout, /My Posts/)
+    assert.equal(layout.includes('Post Automations'), false)
+    const publicPost = readFileSync(join(root, 'nextjs/src/app/(public)/posts/[slug]/page.tsx'), 'utf8')
+    assert.match(publicPost, /blogBodyHtml/)
+    assert.match(publicPost, /youtube-nocookie|youtubeNocookieSrc/)
   })
 })
 
