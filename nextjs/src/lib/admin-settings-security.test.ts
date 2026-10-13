@@ -74,10 +74,11 @@ describe('admin_settings select policies', () => {
     }
   })
 
-  it('the new migration is later than every other migration', () => {
+  it('app scope migration remains, and the posts legal migration is the newest file', () => {
     const names = readdirSync(join(root, 'supabase/migrations')).filter((name) => name.endsWith('.sql'))
+    assert.equal(names.includes('20261010160000_admin_settings_app_scope.sql'), true)
     const latest = [...names].sort().at(-1)
-    assert.equal(latest, '20261010160000_admin_settings_app_scope.sql')
+    assert.equal(latest, '20261013120000_posts_editor_legal_settings.sql')
   })
 
   it('schema seeds stay idempotent on (app_key, option_name)', () => {
@@ -272,8 +273,7 @@ function traceAdminQuery() {
 describe('admin settings readers', () => {
   const readers = [
     'nextjs/src/app/(dashboard)/admin/actions.ts',
-    'nextjs/src/lib/actions/privacy.ts',
-    'nextjs/src/lib/actions/terms.ts',
+    'nextjs/src/lib/actions/legal-settings.ts',
     'nextjs/src/lib/openrouter-key.ts',
     'nextjs/src/lib/llm-usage.ts',
   ]
@@ -292,13 +292,16 @@ describe('admin settings readers', () => {
   it('public readers drop secret and password field types', () => {
     for (const file of [
       'nextjs/src/app/(dashboard)/admin/actions.ts',
-      'nextjs/src/lib/actions/privacy.ts',
-      'nextjs/src/lib/actions/terms.ts',
+      'nextjs/src/lib/actions/legal-settings.ts',
     ]) {
       const source = read(file)
       assert.match(source, /\.neq\('option_field_type', 'secret'\)/)
       assert.match(source, /\.neq\('option_field_type', 'password'\)/)
       assert.match(source, /dropConcealedAdminSettings/)
+    }
+    for (const file of ['nextjs/src/lib/actions/privacy.ts', 'nextjs/src/lib/actions/terms.ts']) {
+      const source = read(file)
+      assert.match(source, /loadPublicLegalSettings/)
     }
   })
 
@@ -333,8 +336,7 @@ describe('admin settings readers', () => {
   it('readers and writers do not select or null-filter app_key', () => {
     for (const file of [
       'nextjs/src/app/(dashboard)/admin/actions.ts',
-      'nextjs/src/lib/actions/privacy.ts',
-      'nextjs/src/lib/actions/terms.ts',
+      'nextjs/src/lib/actions/legal-settings.ts',
       'nextjs/src/lib/admin-settings-server.ts',
     ]) {
       const source = read(file)
