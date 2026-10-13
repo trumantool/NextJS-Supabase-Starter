@@ -69,12 +69,22 @@ Phase A is on the blog branch (see pull requests below). It is the marketing-age
 - Admin left sidebar: **Blog → My Posts** (`/admin/blog`). Non-admins keep **Posts** (`/my-posts`) and a **Blog** link that opens `/posts` in a new tab.
 - The public header **Blog** link stays a top-level nav item (`/posts`). This repo has no Services item, so Blog is not inside a Services dropdown. Do not rename `/posts` to `/blog`.
 - My Posts shows a cover, a short preview, Edit, and Delete. Delete confirms with the title and sets `posts.deleted_at`. It never calls `.delete()` on `posts`. Soft-deleted rows drop out of the public roll and the admin list.
-- If `posts.deleted_at` is missing, the code logs the schema gap (`logBlogSchemaGap`) and the delete returns an error. The row is not hard-deleted. Reads retry without the filter. Optional SEO columns (`seo_title`, `meta_description`, `og_image_url`) and `body_doc` are stripped and the write retried when PostgREST reports them missing.
-- The editor has Visual and HTML modes over the same `body_doc` / markdown `body`, SEO fields, a YouTube insert that renders through `youtube-nocookie.com`, and a Back control. `?from=admin` returns to `/admin/blog`. Otherwise Back returns to `/my-posts`.
+- If `posts.deleted_at` is missing, the code logs the schema gap (`logBlogSchemaGap`) and the delete returns an error. The row is not hard-deleted. Reads retry without the filter. Optional SEO columns (`seo_title`, `meta_description`, `og_image_url`), `cover_image_alt`, and `body_doc` are stripped and the write retried when PostgREST reports them missing.
+- The editor keeps TipTap mounted across Visual and HTML. HTML is sanitized before it is written back. A dirty editor asks before leave (`beforeunload` and the Back control) and before discarding the other tab. Cover alt text and the SEO title, meta description, and Open Graph image are on the form. YouTube inserts render through `youtube-nocookie.com`. `?from=admin` returns to `/admin/blog`. Otherwise Back returns to `/my-posts`.
 - An admin can edit any post. Updates do not change `author_id`.
-- No new file was added under `supabase/` for this work, and nothing was applied.
+- `supabase/migrations/20261013120000_posts_editor_legal_settings.sql` adds those columns, the soft-delete policies, and the legal setting keys. It is **unapplied**. Do not apply it.
 
 **Phase B is pending.** Do not implement auto-blog (marketing-agent #141–#148). Do not add Post Automations to the sidebar. Do not add a cron. Phase B waits until the Chief of Staff confirms its migrations and Truman decides whether to move this Vercel project to Pro (Hobby cannot run an hourly cron).
+
+## Legal pages
+
+`/terms` and `/privacy` already loaded `admin_settings` and replaced shortcodes before the legal-pages work. That behavior stayed. The pages now also replace `[site_url]`, `[contact_email]`, and `[effective_date]`, and they still replace `[company_name]`, `[site_title]`, `[support_email]`, `[site_tagline]`, `[contact_address]`, `[support_hours]`, and `[phone_number]`.
+
+Blank identity values use generic phrases (`the site operator`, `this website`, `the contact email published for this site`, `the date this page was last updated`). A blank `[contact_email]` uses `support_email` when that row has a value. A missing or blank terms or privacy body uses generic HTML in code. That fallback does not say Reach Them AI. Stored body text is left as Truman saved it, including any live copy that still says Reach Them AI. Do not rewrite that copy in the shared database.
+
+Admins edit `company_name`, `site_url`, `contact_email`, and `effective_date` on both pages. Saving creates a missing key. A missing `admin_settings` table or column (`42P01`, `42703`, `PGRST200`, `PGRST204`, `PGRST205`) returns an empty list on read and an error on save. The public page stays up on the generic fallback. Secret and password rows stay out of these readers.
+
+Plan: `docs/plans/legal-pages-shortcodes.md`.
 
 ## Open pull requests
 
@@ -89,6 +99,11 @@ Implementation of that plan, stacked and ready for review, not merged:
 2. #27 automations removal and dashboard cards/nav. Base: the #26 branch.
 3. #28 blog Phase A. Base: the #27 branch.
 4. The handoff PR that adds this file. Base: the #28 branch.
+
+Later, stacked on current `main` after that cleanup:
+
+5. Blog editor parity with marketing-agent #150. Base: `main`. Branch `cursor/blog-parity-150-0998`.
+6. Legal shortcodes, the unapplied posts/legal migration, and this handoff update. Base: the blog parity branch. Branch `cursor/legal-pages-sql-0998`.
 
 ## How to commit and open a PR
 

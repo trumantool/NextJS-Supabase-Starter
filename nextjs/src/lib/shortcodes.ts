@@ -12,7 +12,10 @@ type AdminSetting = Tables<'admin_settings'>
 export const SHORTCODE_MAP: Record<string, string> = {
   site_title: 'site_title',
   company_name: 'company_name',
+  site_url: 'site_url',
+  contact_email: 'contact_email',
   support_email: 'support_email',
+  effective_date: 'effective_date',
   site_tagline: 'site_tagline',
   contact_address: 'contact_address',
   support_hours: 'support_hours',
