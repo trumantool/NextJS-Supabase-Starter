@@ -2,6 +2,7 @@ import {SupabaseClient} from "@supabase/supabase-js";
 import {FileObject} from "@supabase/storage-js";
 import {Database} from "@/lib/types";
 import {AGENT_SKILLS_BUCKET} from "@/lib/agent-skills";
+import {authCallbackUrl, getAuthRedirectBase} from "@/lib/auth-redirect";
 import {isSkillRowVisible} from "@/lib/starter-catalog-allowlist";
 
 /**
@@ -54,9 +55,11 @@ export class SassClient {
     }
 
     async registerEmail(email: string, password: string) {
+        const emailRedirectTo = await this.emailConfirmRedirectUrl()
         return this.client.auth.signUp({
             email: email,
-            password: password
+            password: password,
+            options: emailRedirectTo ? { emailRedirectTo } : undefined,
         });
     }
 
@@ -65,10 +68,26 @@ export class SassClient {
     }
 
     async resendVerificationEmail(email: string) {
+        const emailRedirectTo = await this.emailConfirmRedirectUrl()
         return this.client.auth.resend({
             email: email,
-            type: 'signup'
+            type: 'signup',
+            options: emailRedirectTo ? { emailRedirectTo } : undefined,
         })
+    }
+
+    /**
+     * Email confirmation lands on `{base}/api/auth/callback`.
+     * `base` is admin_settings.login_redirect_url when set, otherwise
+     * NEXT_PUBLIC_APP_URL or the current origin.
+     */
+    private async emailConfirmRedirectUrl(): Promise<string | null> {
+        const origin =
+            this.clientType === ClientType.SPA && typeof window !== 'undefined'
+                ? window.location.origin
+                : ''
+        const base = await getAuthRedirectBase(this.client, origin)
+        return base ? authCallbackUrl(base) : null
     }
 
     async logout() {

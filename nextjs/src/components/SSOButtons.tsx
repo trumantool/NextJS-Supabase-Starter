@@ -1,6 +1,7 @@
 'use client';
 
 import { createSPAClient } from '@/lib/supabase/client';
+import { authCallbackUrl, getAuthRedirectBase } from '@/lib/auth-redirect';
 import Link from "next/link";
 
 type Provider = 'github' | 'google' | 'facebook' | 'apple';
@@ -70,10 +71,11 @@ export default function SSOButtons({ onError }: SSOButtonsProps) {
     const handleSSOLogin = async (provider: Provider) => {
         try {
             const supabase = createSPAClient();
+            const base = await getAuthRedirectBase(supabase, window.location.origin);
             const { error } = await supabase.auth.signInWithOAuth({
                 provider,
                 options: {
-                    redirectTo: `${window.location.origin}/api/auth/callback`,
+                    redirectTo: authCallbackUrl(base || window.location.origin),
                 },
             });
 
