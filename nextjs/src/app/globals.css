@@ -354,6 +354,12 @@
   @apply prose prose-slate max-w-none;
 }
 
+.ProseMirror img,
+.ProseMirror iframe,
+.youtube-embed {
+  max-width: 100%;
+}
+
 .tiptap h1,
 .ProseMirror h1 {
   @apply text-3xl font-bold mt-8 mb-4;

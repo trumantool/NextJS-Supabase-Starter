@@ -21,7 +21,7 @@ import {
   slugifyTitle,
   type PostWebsite,
 } from '@/lib/posts'
-import { docToMarkdown, isTipTapDoc } from '@/lib/blog-doc'
+import { bodyDocIsSafe, docToMarkdown, isTipTapDoc } from '@/lib/blog-doc'
 
 export type PostInput = {
   title?: unknown
@@ -40,12 +40,14 @@ export type PostInput = {
   seo_title?: unknown
   meta_description?: unknown
   og_image_url?: unknown
+  cover_image_alt?: unknown
 }
 
 type PostWrite = Database['public']['Tables']['posts']['Update'] & {
   seo_title?: string | null
   meta_description?: string | null
   og_image_url?: string | null
+  cover_image_alt?: string | null
   deleted_at?: string
 }
 
@@ -424,6 +426,11 @@ function dropMissingWriteColumn(fields: PostWrite, error: { code?: string; messa
     delete copy.og_image_url
     return copy
   }
+  if (/cover_image_alt/i.test(message) && 'cover_image_alt' in fields) {
+    const copy = { ...fields }
+    delete copy.cover_image_alt
+    return copy
+  }
   return null
 }
 
@@ -580,6 +587,7 @@ async function normalizePost(input: PostInput, _website: PostWebsite, existing?:
     seo_title?: string | null
     meta_description?: string | null
     og_image_url?: string | null
+    cover_image_alt?: string | null
   }) | undefined
   let bodyText = ''
   if (input.body_doc !== undefined) {
@@ -587,6 +595,8 @@ async function normalizePost(input: PostInput, _website: PostWebsite, existing?:
       bodyText = typeof input.body === 'string' ? input.body : existing?.body ?? ''
     } else if (!isTipTapDoc(input.body_doc)) {
       throw new Error('Body must be a document')
+    } else if (!bodyDocIsSafe(input.body_doc.content)) {
+      throw new Error('The document is not valid.')
     } else {
       bodyText = docToMarkdown(input.body_doc)
     }
@@ -640,6 +650,11 @@ async function normalizePost(input: PostInput, _website: PostWebsite, existing?:
       'Meta description'
     ),
     og_image_url: optionalUrl(input.og_image_url ?? prior?.og_image_url ?? null, 'Social image URL'),
+    cover_image_alt: optionalText(
+      input.cover_image_alt ?? prior?.cover_image_alt ?? null,
+      500,
+      'Cover image alt text'
+    ),
     sort_order,
     origin: null,
   }

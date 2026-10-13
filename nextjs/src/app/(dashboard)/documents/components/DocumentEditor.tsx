@@ -2,7 +2,7 @@
 
 // Documents — Word-like TipTap editor.
 import { useEffect, useRef, useState } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import type { Extensions } from '@tiptap/core'
 import { documentExtensions } from '../lib/editor-schema'
 import type { TipTapDoc } from '../lib/types'
@@ -18,6 +18,9 @@ interface Props {
   onRequestImageUrl?: () => Promise<string | null>
   /** Defaults to the document schema. Blog posts pass the YouTube extension too. */
   extensions?: Extensions
+  /** Keep TipTap mounted while the HTML tab is showing. */
+  hidden?: boolean
+  editorRef?: { current: Editor | null }
 }
 
 function countsFromDoc(doc: TipTapDoc) {
@@ -51,6 +54,8 @@ export function DocumentEditor({
   exporting,
   onRequestImageUrl,
   extensions = documentExtensions,
+  hidden = false,
+  editorRef,
 }: Props) {
   const onDocChangeRef = useRef(onDocChange)
   onDocChangeRef.current = onDocChange
@@ -71,6 +76,14 @@ export function DocumentEditor({
     },
   })
 
+  useEffect(() => {
+    if (!editorRef) return
+    editorRef.current = editor
+    return () => {
+      if (editorRef.current === editor) editorRef.current = null
+    }
+  }, [editor, editorRef])
+
   // Keep the editor in sync if the loaded doc changes (e.g. template switch).
   useEffect(() => {
     if (editor && initialDoc) {
@@ -83,7 +96,7 @@ export function DocumentEditor({
   }, [editor, initialDoc])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className={`flex h-full min-w-0 max-w-full flex-col ${hidden ? 'hidden' : ''}`}>
       <DocumentToolbar
         editor={editor}
         onExport={onExport}

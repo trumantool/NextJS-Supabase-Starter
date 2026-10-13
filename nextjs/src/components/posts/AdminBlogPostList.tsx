@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { excerpt } from '@/lib/blog-roll'
+import { postPreview } from '@/lib/blog/preview'
 
 export type AdminBlogPost = {
   id: string
@@ -54,7 +54,7 @@ export function AdminBlogPostList({ posts }: { posts: AdminBlogPost[] }) {
       {error ? <p className="mb-3 text-sm text-red-700">{error}</p> : null}
       <ul className="divide-y divide-gray-200 rounded-lg bg-white ring-1 ring-gray-200">
         {posts.map((post) => {
-          const preview = excerpt(post.summary || post.body, 140)
+          const preview = postPreview(post.body, post.summary)
           return (
             <li key={post.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start">
               {post.cover_image_url ? (
