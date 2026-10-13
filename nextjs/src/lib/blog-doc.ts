@@ -10,6 +10,53 @@ export function isTipTapDoc(value: unknown): value is BlogDoc {
   return isRecord(value) && value.type === 'doc' && Array.isArray(value.content)
 }
 
+const BLOG_NODE_TYPES = new Set([
+  'paragraph',
+  'text',
+  'heading',
+  'bulletList',
+  'orderedList',
+  'listItem',
+  'blockquote',
+  'codeBlock',
+  'horizontalRule',
+  'hardBreak',
+  'taskList',
+  'taskItem',
+  'table',
+  'tableRow',
+  'tableHeader',
+  'tableCell',
+  'image',
+  'youtube',
+])
+
+function unsafeLinkHref(href: unknown): boolean {
+  if (typeof href !== 'string') return false
+  const normalized = href.trim().toLowerCase().replace(/[\u0000-\u0020]+/g, '')
+  return (
+    normalized.startsWith('javascript:') ||
+    normalized.startsWith('data:') ||
+    normalized.startsWith('vbscript:')
+  )
+}
+
+/** Reject unknown nodes, non-https images, and scriptable link marks. */
+export function bodyDocIsSafe(nodes: PmNode[]): boolean {
+  for (const node of nodes) {
+    if (!node || typeof node !== 'object' || !BLOG_NODE_TYPES.has(node.type)) return false
+    if (node.type === 'image') {
+      const src = node.attrs?.src
+      if (src != null && (typeof src !== 'string' || !/^https:\/\/\S+$/.test(src))) return false
+    }
+    for (const mark of node.marks ?? []) {
+      if (mark?.type === 'link' && unsafeLinkHref(mark.attrs?.href)) return false
+    }
+    if (node.content && !bodyDocIsSafe(node.content)) return false
+  }
+  return true
+}
+
 export function docFromBody(body: string | null | undefined): BlogDoc {
   const text = (body ?? '').trim()
   if (!text) return { type: 'doc', content: [{ type: 'paragraph' }] }

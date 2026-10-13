@@ -155,7 +155,7 @@ export function DocumentToolbar({ editor, onExport, onOpenAi, exporting, onReque
   const currentColor = (ed.getAttributes('textStyle').color as string) || '#000000'
 
   return (
-    <div className="flex items-center gap-1 border-b border-gray-200 bg-white px-3 py-2 flex-wrap">
+    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1 border-b border-gray-200 bg-white px-3 py-2">
       {/* History */}
       <ToolButton
         title="Undo"
