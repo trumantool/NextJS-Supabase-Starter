@@ -9,7 +9,7 @@ import {
     X,
     ChevronDown,
     LogOut,
-    Key,     Files, LucideListTodo, FileText, Settings, ShieldCheck,     Bot, BookOpen, MessageSquare, CalendarClock, Newspaper,
+    Key,     Files, LucideListTodo, FileText, Settings, ShieldCheck,     Bot, BookOpen, MessageSquare, Newspaper,
 } from 'lucide-react';
 import { useGlobal } from "@/lib/context/GlobalContext";
 import { createSPASassClient } from "@/lib/supabase/client";
@@ -18,6 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const [isSidebarOpen, setSidebarOpen] = useState(false);
     const [isUserDropdownOpen, setUserDropdownOpen] = useState(false);
     const [isAdminMenuOpen, setAdminMenuOpen] = useState(false);
+    const [isBlogMenuOpen, setBlogMenuOpen] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
 
@@ -45,7 +46,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     const productName = process.env.NEXT_PUBLIC_PRODUCTNAME;
 
-    const navigation = [
+    const navigation: Array<{
+        name: string
+        href: string
+        icon: typeof Home
+        external?: boolean
+    }> = [
         { name: 'Home', href: '/dashboard', icon: Home },
         { name: 'Documents', href: '/documents', icon: FileText },
         { name: 'My Files', href: '/storage', icon: Files },
@@ -53,27 +59,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         { name: 'Chat', href: '/chat', icon: MessageSquare },
         { name: 'Agents', href: '/agents', icon: Bot },
         { name: 'Skills', href: '/agent-skills', icon: BookOpen },
-        { name: 'Automations', href: '/automations', icon: CalendarClock },
         { name: 'Posts', href: '/my-posts', icon: Newspaper },
+        ...(!isAdmin
+            ? [{ name: 'Blog', href: '/posts', icon: Newspaper, external: true as const }]
+            : []),
         { name: 'User Settings', href: '/user-settings', icon: User },
     ];
 
-    // Admin submenu (only visible to admins)
+    // Admin submenu (only visible to admins). Blog opens My Posts, not automations.
     const adminMenuItems = isAdmin
         ? [
             { name: 'Admin Settings', href: '/admin', icon: Settings },
-            { name: 'Blog', href: '/admin/blog', icon: Newspaper },
           ]
         : [];
 
     const isAdminPage = pathname.startsWith('/admin');
+    const isBlogAdminPage = pathname.startsWith('/admin/blog');
 
-    // Auto-open the admin submenu when on an admin page
+    // Auto-open the admin submenu when on an admin page, and Blog on My Posts.
     useEffect(() => {
         if (isAdminPage) {
             setAdminMenuOpen(true);
         }
     }, [isAdminPage]);
+
+    useEffect(() => {
+        if (isBlogAdminPage) {
+            setBlogMenuOpen(true);
+        }
+    }, [isBlogAdminPage]);
 
     const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
 
@@ -107,26 +121,42 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {/* Navigation */}
                 <nav className="mt-4 px-2 space-y-1">
                     {navigation.map((item) => {
-                        const isActive =
-                            item.href === '/dashboard'
+                        const isActive = item.external
+                            ? false
+                            : item.href === '/dashboard'
                                 ? pathname === item.href
                                 : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                        const className = `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+                            isActive
+                                ? 'bg-primary-50 text-primary-600'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        }`;
+                        const iconClass = `mr-3 h-5 w-5 ${
+                            isActive ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
+                        }`;
+                        if (item.external) {
+                            return (
+                                <a
+                                    key={item.name}
+                                    href={item.href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={closeSidebarOnSelect}
+                                    className={className}
+                                >
+                                    <item.icon className={iconClass} />
+                                    {item.name}
+                                </a>
+                            );
+                        }
                         return (
                             <Link
                                 key={item.name}
                                 href={item.href}
                                 onClick={closeSidebarOnSelect}
-                                className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                                    isActive
-                                        ? 'bg-primary-50 text-primary-600'
-                                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                                }`}
+                                className={className}
                             >
-                                <item.icon
-                                    className={`mr-3 h-5 w-5 ${
-                                        isActive ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
-                                    }`}
-                                />
+                                <item.icon className={iconClass} />
                                 {item.name}
                             </Link>
                         );
@@ -180,6 +210,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                             </Link>
                                         );
                                     })}
+                                    <button
+                                        type="button"
+                                        onClick={() => setBlogMenuOpen((prev) => !prev)}
+                                        aria-expanded={isBlogMenuOpen}
+                                        className={`w-full flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md ${
+                                            isBlogAdminPage
+                                                ? 'bg-red-100 text-red-700'
+                                                : 'text-gray-600 hover:bg-red-50 hover:text-red-700'
+                                        }`}
+                                    >
+                                        <span className="flex items-center">
+                                            <Newspaper className={`mr-3 h-4 w-4 ${isBlogAdminPage ? 'text-red-600' : 'text-gray-400'}`} />
+                                            Blog
+                                        </span>
+                                        <ChevronDown
+                                            className={`h-4 w-4 transition-transform duration-200 ${
+                                                isBlogMenuOpen ? 'rotate-180' : ''
+                                            }`}
+                                        />
+                                    </button>
+                                    {isBlogMenuOpen && (
+                                        <Link
+                                            href="/admin/blog"
+                                            onClick={closeSidebarOnSelect}
+                                            className={`flex items-center px-2 py-2 pl-9 text-sm font-medium rounded-md ${
+                                                isBlogAdminPage
+                                                    ? 'bg-red-100 text-red-700'
+                                                    : 'text-gray-600 hover:bg-red-50 hover:text-red-700'
+                                            }`}
+                                        >
+                                            My Posts
+                                        </Link>
+                                    )}
                                 </div>
                             )}
                         </div>

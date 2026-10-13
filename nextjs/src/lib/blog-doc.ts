@@ -73,6 +73,10 @@ function blockToMarkdown(node: PmNode): string {
     }
     case 'horizontalRule':
       return '---'
+    case 'youtube': {
+      const id = typeof node.attrs?.videoId === 'string' ? node.attrs.videoId : ''
+      return id ? `https://www.youtube.com/watch?v=${id}` : ''
+    }
     default: {
       if (node.content) {
         return node.content
