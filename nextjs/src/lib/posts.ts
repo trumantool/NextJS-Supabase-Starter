@@ -65,6 +65,17 @@ export function isMissingBodyDocError(
   return /body_doc/i.test(error?.message ?? '')
 }
 
+export function isMissingDeletedAtError(
+  error: { code?: string | null; message?: string | null } | null | undefined
+): boolean {
+  if (!isMissingBlogSchemaError(error)) return false
+  return /deleted_at/i.test(error?.message ?? '')
+}
+
+/** Shown when posts.deleted_at is absent. Never follow this with a hard delete. */
+export const SOFT_DELETE_UNAVAILABLE =
+  'Soft delete is unavailable because posts.deleted_at is missing. The post was not deleted.'
+
 export function logBlogSchemaGap(
   label: string,
   error: { code?: string | null; message?: string | null }

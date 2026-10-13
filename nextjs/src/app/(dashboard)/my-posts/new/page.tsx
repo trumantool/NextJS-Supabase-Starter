@@ -5,5 +5,5 @@ export const metadata = {
 }
 
 export default function NewPostPage() {
-  return <PostEditor mode="new" />
+  return <PostEditor mode="new" backHref="/my-posts" />
 }

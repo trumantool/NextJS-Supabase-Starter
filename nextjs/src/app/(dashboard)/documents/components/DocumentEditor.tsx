@@ -3,6 +3,7 @@
 // Documents — Word-like TipTap editor.
 import { useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
+import type { Extensions } from '@tiptap/core'
 import { documentExtensions } from '../lib/editor-schema'
 import type { TipTapDoc } from '../lib/types'
 import { DocumentToolbar } from './DocumentToolbar'
@@ -15,6 +16,8 @@ interface Props {
   onOpenAi: () => void
   exporting?: boolean
   onRequestImageUrl?: () => Promise<string | null>
+  /** Defaults to the document schema. Blog posts pass the YouTube extension too. */
+  extensions?: Extensions
 }
 
 function countsFromDoc(doc: TipTapDoc) {
@@ -47,6 +50,7 @@ export function DocumentEditor({
   onOpenAi,
   exporting,
   onRequestImageUrl,
+  extensions = documentExtensions,
 }: Props) {
   const onDocChangeRef = useRef(onDocChange)
   onDocChangeRef.current = onDocChange
@@ -54,7 +58,7 @@ export function DocumentEditor({
   const [counts, setCounts] = useState(() => countsFromDoc(initialDoc))
 
   const editor = useEditor({
-    extensions: documentExtensions,
+    extensions,
     content: initialDoc,
     editorProps: {
       attributes: {
