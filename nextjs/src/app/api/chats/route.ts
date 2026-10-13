@@ -5,6 +5,7 @@ import { getPlatformChatModel, getValidChatModel } from '@/lib/chat-openrouter'
 import { fetchTagsByChatIds, fetchUserTagCatalog, type TagRef } from '@/lib/chat-tags'
 import type { ChatThread } from '@/lib/chat-types'
 import { isUuid } from '@/lib/ids'
+import { isUserAgentVisible } from '@/lib/starter-catalog-allowlist'
 import { createSSRClient } from '@/lib/supabase/server'
 
 /**
@@ -28,6 +29,22 @@ export async function GET(request: NextRequest) {
 
     if (agentParam && !isUuid(agentParam)) {
       return NextResponse.json({ error: 'agent-id must be a UUID.' }, { status: 400 })
+    }
+
+    if (agentParam) {
+      const { data: agent, error: agentError } = await supabase
+        .from('user_agents')
+        .select('id, source_template_id, source_template_name, defaults')
+        .eq('id', agentParam)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (agentError) {
+        console.error('Failed to load chat agent:', agentError)
+        return NextResponse.json({ error: 'Failed to list chats' }, { status: 500 })
+      }
+      if (!agent || !isUserAgentVisible(agent)) {
+        return NextResponse.json({ chats: [], tags: [] })
+      }
     }
 
     let query = supabase
@@ -93,12 +110,12 @@ export async function POST(request: NextRequest) {
       }
       const { data: agent, error: agentError } = await supabase
         .from('user_agents')
-        .select('id, defaults')
+        .select('id, defaults, source_template_id, source_template_name')
         .eq('id', body.agentId)
         .eq('user_id', user.id)
         .maybeSingle()
 
-      if (agentError || !agent) {
+      if (agentError || !agent || !isUserAgentVisible(agent)) {
         return NextResponse.json({ error: 'Agent not found.' }, { status: 404 })
       }
       agentId = agent.id

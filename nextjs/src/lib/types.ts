@@ -42,6 +42,7 @@ export type Database = {
       admin_settings: {
         Row: {
           id: string
+          app_key: string | null
           option_name: string
           option_value: string
           option_field_type: string
@@ -52,6 +53,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          app_key?: string | null
           option_name: string
           option_value?: string
           option_field_type?: string
@@ -62,6 +64,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          app_key?: string | null
           option_name?: string
           option_value?: string
           option_field_type?: string

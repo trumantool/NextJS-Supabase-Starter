@@ -49,8 +49,7 @@ export async function updateSession(request: NextRequest) {
         '/chat',
         '/agents',
         '/agent-skills',
-        '/agent-templates',
-        '/automations',
+        // Phase B may protect an admin-only blog automation screen. Do not link /automations until then.
         '/my-posts',
     ]
     const isProtected = protectedPaths.some((p) =>

@@ -4,9 +4,7 @@ import { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Loader2 } from 'lucide-react'
-import { createSPASassClientAuthenticated as createSPASassClient } from '@/lib/supabase/client'
-import { loadSkillFileText, prepareSkillPreviewBody } from '@/lib/agent-skills'
-import type { AgentSkillRow } from './actions'
+import { previewAgentSkill, type AgentSkillRow } from './actions'
 
 export function SkillPreviewDialog({
   skill,
@@ -29,11 +27,11 @@ export function SkillPreviewDialog({
     setBody('')
     void (async () => {
       try {
-        const supabase = await createSPASassClient()
-        const text = await loadSkillFileText(skill.skill_url, (key, expires) =>
-          supabase.signAgentSkillUrl(key, expires ?? 60)
-        )
-        if (!cancelled) setBody(prepareSkillPreviewBody(text))
+        const result = await previewAgentSkill(skill.id)
+        if (!result.success || !result.data) {
+          throw new Error(result.message)
+        }
+        if (!cancelled) setBody(result.data.text)
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load skill')
