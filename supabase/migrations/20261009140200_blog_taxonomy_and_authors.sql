@@ -129,8 +129,10 @@ TO authenticated
 USING ((SELECT auth.uid()) IS NOT NULL OR authenticative.is_admin())
 WITH CHECK ((SELECT auth.uid()) IS NOT NULL OR authenticative.is_admin());
 
+-- Split so the anon policy never calls authenticative.is_admin().
 DROP POLICY IF EXISTS post_categories_select ON public.post_categories;
-CREATE POLICY post_categories_select
+DROP POLICY IF EXISTS post_categories_select_public ON public.post_categories;
+CREATE POLICY post_categories_select_public
 ON public.post_categories
 FOR SELECT
 TO anon, authenticated
@@ -139,16 +141,31 @@ USING (
         SELECT 1
         FROM public.posts p
         WHERE p.id = post_id
-          AND (
-            (
-                p.type = 'blog'
-                AND p.status = 'published'
-                AND p.published_at IS NOT NULL
-                AND p.published_at <= now()
-            )
-            OR p.author_id = (SELECT auth.uid())
-            OR authenticative.is_admin()
-          )
+          AND p.type = 'blog'
+          AND p.status = 'published'
+          AND p.published_at IS NOT NULL
+          AND p.published_at <= now()
+    )
+);
+
+DROP POLICY IF EXISTS post_categories_select_admin ON public.post_categories;
+CREATE POLICY post_categories_select_admin
+ON public.post_categories
+FOR SELECT
+TO authenticated
+USING (authenticative.is_admin());
+
+DROP POLICY IF EXISTS post_categories_select_author ON public.post_categories;
+CREATE POLICY post_categories_select_author
+ON public.post_categories
+FOR SELECT
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND p.author_id = (SELECT auth.uid())
     )
 );
 
@@ -177,7 +194,8 @@ WITH CHECK (
 );
 
 DROP POLICY IF EXISTS post_tags_select ON public.post_tags;
-CREATE POLICY post_tags_select
+DROP POLICY IF EXISTS post_tags_select_public ON public.post_tags;
+CREATE POLICY post_tags_select_public
 ON public.post_tags
 FOR SELECT
 TO anon, authenticated
@@ -186,16 +204,31 @@ USING (
         SELECT 1
         FROM public.posts p
         WHERE p.id = post_id
-          AND (
-            (
-                p.type = 'blog'
-                AND p.status = 'published'
-                AND p.published_at IS NOT NULL
-                AND p.published_at <= now()
-            )
-            OR p.author_id = (SELECT auth.uid())
-            OR authenticative.is_admin()
-          )
+          AND p.type = 'blog'
+          AND p.status = 'published'
+          AND p.published_at IS NOT NULL
+          AND p.published_at <= now()
+    )
+);
+
+DROP POLICY IF EXISTS post_tags_select_admin ON public.post_tags;
+CREATE POLICY post_tags_select_admin
+ON public.post_tags
+FOR SELECT
+TO authenticated
+USING (authenticative.is_admin());
+
+DROP POLICY IF EXISTS post_tags_select_author ON public.post_tags;
+CREATE POLICY post_tags_select_author
+ON public.post_tags
+FOR SELECT
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND p.author_id = (SELECT auth.uid())
     )
 );
 

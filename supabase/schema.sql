@@ -61,6 +61,11 @@ AS $$
   );
 $$;
 
+-- Called from authenticated RLS only. anon never receives EXECUTE.
+REVOKE EXECUTE ON FUNCTION authenticative.is_user_authenticated() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION authenticative.is_user_authenticated() TO authenticated;
+GRANT EXECUTE ON FUNCTION authenticative.is_user_authenticated() TO service_role;
+
 -- Body references public.user_data; plpgsql is parsed at call time so this
 -- can be created before the table exists.
 CREATE OR REPLACE FUNCTION authenticative.is_admin()
@@ -79,7 +84,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION authenticative.is_admin() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION authenticative.is_admin() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO service_role;
 
@@ -136,7 +141,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO service_role;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin;
 
@@ -652,7 +657,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.enqueue_automation_run(uuid, text, timestamptz, text) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.claim_queued_automation_runs(p_limit integer DEFAULT 5)
@@ -692,7 +697,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.claim_queued_automation_runs(integer) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.claim_queued_automation_runs(integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_queued_automation_runs(integer) TO service_role;
 
 -- ============================================================================
@@ -2183,8 +2188,10 @@ TO authenticated
 USING ((SELECT auth.uid()) IS NOT NULL OR authenticative.is_admin())
 WITH CHECK ((SELECT auth.uid()) IS NOT NULL OR authenticative.is_admin());
 
+-- Split so the anon policy never calls authenticative.is_admin().
 DROP POLICY IF EXISTS post_categories_select ON public.post_categories;
-CREATE POLICY post_categories_select
+DROP POLICY IF EXISTS post_categories_select_public ON public.post_categories;
+CREATE POLICY post_categories_select_public
 ON public.post_categories
 FOR SELECT
 TO anon, authenticated
@@ -2193,16 +2200,31 @@ USING (
         SELECT 1
         FROM public.posts p
         WHERE p.id = post_id
-          AND (
-            (
-                p.type = 'blog'
-                AND p.status = 'published'
-                AND p.published_at IS NOT NULL
-                AND p.published_at <= now()
-            )
-            OR p.author_id = (SELECT auth.uid())
-            OR authenticative.is_admin()
-          )
+          AND p.type = 'blog'
+          AND p.status = 'published'
+          AND p.published_at IS NOT NULL
+          AND p.published_at <= now()
+    )
+);
+
+DROP POLICY IF EXISTS post_categories_select_admin ON public.post_categories;
+CREATE POLICY post_categories_select_admin
+ON public.post_categories
+FOR SELECT
+TO authenticated
+USING (authenticative.is_admin());
+
+DROP POLICY IF EXISTS post_categories_select_author ON public.post_categories;
+CREATE POLICY post_categories_select_author
+ON public.post_categories
+FOR SELECT
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND p.author_id = (SELECT auth.uid())
     )
 );
 
@@ -2231,7 +2253,8 @@ WITH CHECK (
 );
 
 DROP POLICY IF EXISTS post_tags_select ON public.post_tags;
-CREATE POLICY post_tags_select
+DROP POLICY IF EXISTS post_tags_select_public ON public.post_tags;
+CREATE POLICY post_tags_select_public
 ON public.post_tags
 FOR SELECT
 TO anon, authenticated
@@ -2240,16 +2263,31 @@ USING (
         SELECT 1
         FROM public.posts p
         WHERE p.id = post_id
-          AND (
-            (
-                p.type = 'blog'
-                AND p.status = 'published'
-                AND p.published_at IS NOT NULL
-                AND p.published_at <= now()
-            )
-            OR p.author_id = (SELECT auth.uid())
-            OR authenticative.is_admin()
-          )
+          AND p.type = 'blog'
+          AND p.status = 'published'
+          AND p.published_at IS NOT NULL
+          AND p.published_at <= now()
+    )
+);
+
+DROP POLICY IF EXISTS post_tags_select_admin ON public.post_tags;
+CREATE POLICY post_tags_select_admin
+ON public.post_tags
+FOR SELECT
+TO authenticated
+USING (authenticative.is_admin());
+
+DROP POLICY IF EXISTS post_tags_select_author ON public.post_tags;
+CREATE POLICY post_tags_select_author
+ON public.post_tags
+FOR SELECT
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1
+        FROM public.posts p
+        WHERE p.id = post_id
+          AND p.author_id = (SELECT auth.uid())
     )
 );
 
