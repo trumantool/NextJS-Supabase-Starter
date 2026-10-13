@@ -12,21 +12,35 @@
 **Reference only:** `trumantool/marketing-agent`, `trumantool/edu-tutorials`  
 **Author (if needed):** Truman Tool \<admin@trumantool.com\>
 
+## Status on main (`46ee4ad`)
+
+This feature set is already on `main` (posts, Stripe, and the token ledger from #14, plus the blog follow-ups). Do not implement it again.
+
+Cleanup PRs #26–#29 are also on `main`:
+
+- The agent-template catalog UI and the automations product (pages, API, and crons) are gone. `nextjs/vercel.json` is `{}`. Do not put those surfaces back while following this plan.
+- Blog Phase A is in. The public header label is **Blog** and the path stays `/posts`. Do not rename it to `/blog`. Admin **Blog → My Posts** is `/admin/blog`.
+- `admin_settings` uniqueness is `(app_key, option_name)` NULLS NOT DISTINCT (`20261010160000`). Seeds use `ON CONFLICT (app_key, option_name)`. A blank `ADMIN_SETTINGS_APP_KEY` is unscoped.
+- `@paddle/*` dependencies are gone.
+- Schema files are still not applied to `glplvrljdgowcwuubkau` or the paused starter `cyczlgdaocwueaacqxsh`.
+
+Open PRs #11 (registration provenance) and #12 (post-login redirect) are separate. Each one has to keep working against `main` on its own. Both edit the `schema.sql` admin_settings seed.
+
 ## Global Constraints
 
 - Docs/plan first; this plan file is the deliverable for Planning. Implementation is a later Eng task — **do not hand off from this Planning turn**.
 - No Composio. OpenRouter + skills only (existing v1 decision).
 - No course tools, Studio, YouTube search, reviews, course caps, course pricing cards.
-- This plan does **not** add or expand `agent_templates` / `user_agents` / template catalogs (CoS exclude). Those already exist on `main` — leave as-is unless Truman asks to remove.
+- This plan does **not** add or expand `agent_templates` / `user_agents` / template catalogs (CoS exclude). Cleanup already removed the template catalog UI and the automations product. Leave that removal in place.
 - Never re-apply Marketing migrations `20260922100000_user_token_usage.sql`, `20260926130000_llm_models_catalog.sql`, or Edu `edu_openrouter_token_tracking` onto `glplvrljdgowcwuubkau`.
 - Do not copy secret key **values**. Seed empty admin setting rows only.
-- Account for open PRs [#11](https://github.com/trumantool/NextJS-Supabase-Starter/pull/11) (registration provenance) and [#12](https://github.com/trumantool/NextJS-Supabase-Starter/pull/12) (`login_redirect_url`) — avoid conflicting `handle_new_user` / `admin_settings` / `schema.sql` edits; land after or rebase onto them.
+- PRs [#11](https://github.com/trumantool/NextJS-Supabase-Starter/pull/11) and [#12](https://github.com/trumantool/NextJS-Supabase-Starter/pull/12) still edit `handle_new_user`, `admin_settings`, and `schema.sql` on their own branches. This plan does not need another edit there.
 
 ---
 
 ## Summary
 
-Slim extract on `main` already ships auth, files, documents + AI editor, todos, general AI chat, skills, user agents, templates, automations, and user/admin settings. Net-new for a local-business clone is: **profile billing columns**, **`posts` writing**, **Stripe on `user_data`**, and the **shared LLM token ledger** with **generic** OpenRouter admin keys.
+`main` already has auth, files, documents + AI editor, todos, general AI chat, skills, the General and Task Management agents, user/admin settings, **posts**, **Stripe on `user_data`**, and the **shared LLM token ledger** with generic OpenRouter admin keys. Template catalogs, automations, and crons are removed. The net-new work in this document is historical.
 
 ## Goals / non-goals
 
@@ -34,7 +48,7 @@ Slim extract on `main` already ships auth, files, documents + AI editor, todos, 
 1. Extend `user_data` / `user_settings` for profile + plan + Stripe + token totals (columns listed below).
 2. Add `public.posts` (not `blog_posts`) with CRUD/admin + public reading suitable for a basic site.
 3. Wire Stripe Checkout, Customer Portal, and webhook to keep `user_data` plan fields in sync.
-4. Add `llm_models`, `llm_turn_rates`, and `record_llm_turn_usage` (10-arg, no course post id); record usage from existing chat (and automations if cheap) via Marketing’s persist pattern.
+4. Add `llm_models`, `llm_turn_rates`, and `record_llm_turn_usage` (10-arg, no course post id); record usage from existing chat via Marketing’s persist pattern. The automations product is removed, so do not add an automation recording path.
 5. Seed generic `admin_settings`: `openrouter_api_key`, `openrouter_force_platform_key`, `openrouter_cost_markup`.
 
 ### Non-goals
@@ -60,13 +74,14 @@ Slim extract on `main` already ships auth, files, documents + AI editor, todos, 
 |------|-----------------|
 | Auth / MFA / settings shell | Yes |
 | Files, todos, documents + AI | Yes |
-| Chat, skills, agents, templates, automations | Yes — **out of scope to expand or remove here** |
-| `user_data` | `user_id`, role, first/last/email, social URLs — **no** plan/Stripe/tokens |
+| Chat, skills, General + Task Management agents | Yes. Template catalog UI and automations/crons are **removed** |
+| `user_data` | Identity fields plus plan, Stripe, and token totals |
 | `user_settings` | first/last/email + `openrouter_api_key` (no separate `name` column) |
-| OpenRouter | Env + BYOK + `app_settings.openrouter_model` — **no** ledger / generic admin key trio |
-| Posts / blog | Absent |
-| Stripe | Absent (dead `@paddle/*` deps in package.json only) |
-| Open PRs | #11 provenance; #12 login redirect |
+| OpenRouter | Env + BYOK + generic admin key trio + ledger (`record_llm_turn_usage`) |
+| Posts / blog | Present. Public path `/posts`, nav label **Blog**. Phase A admin list at `/admin/blog` |
+| Stripe | Present: checkout, portal, webhook. No `@paddle/*` deps |
+| `admin_settings` | Unique `(app_key, option_name)`. Blank `ADMIN_SETTINGS_APP_KEY` stays unscoped |
+| Open PRs | #11 provenance and #12 login redirect are separate and still open |
 
 ## Gap analysis: keep / adapt / add
 
@@ -75,11 +90,11 @@ Slim extract on `main` already ships auth, files, documents + AI editor, todos, 
 | Existing slim features | **Keep** — do not re-spec |
 | Profile first/last/email | **Keep** columns; **add** plan/Stripe/token cols; **adapt** settings UI for editable names + plan display |
 | CoS `user_settings.name` | **Map** to existing `first_name`/`last_name` (do not add redundant `name` unless product insists) |
-| `posts` | **Add** |
-| Stripe | **Add** (columns + API routes + webhook) |
-| Token ledger + generic admin keys | **Add** (port Marketing shape, no course parent) |
-| Chat recording path | **Adapt** existing chat persist to call `record_llm_turn_usage` |
-| `user_agents` / templates | **Leave as-is** (excluded from this plan) |
+| `posts` | **Shipped** — do not add a second posts model |
+| Stripe | **Shipped** (columns + API routes + webhook) |
+| Token ledger + generic admin keys | **Shipped** (Marketing shape, no course parent) |
+| Chat recording path | **Shipped** — chat persist calls `record_llm_turn_usage` |
+| `user_agents` / templates | **Leave the cleanup in place.** Do not restore the template catalog or automations |
 
 ## Proposed design
 
@@ -94,7 +109,7 @@ Protect token columns with the same privileged-column pattern as Marketing (`pro
 ### Writing (`public.posts`)
 Columns: `id`, `type`, `parent_id`, `title`, `slug`, `summary`, `body`, `video_url`, `cover_image_url`, `sort_order`, `status`, `published_at`, `author_id`, `origin`.  
 RLS: public read for published; authors (and admins) write.  
-UI: minimal author list/editor + public `/posts` (or `/blog`) list/detail. No separate `blog_posts` table.
+UI: author list/editor + public `/posts` list/detail. The nav label is **Blog**. Do not rename the path to `/blog`. No separate `blog_posts` table.
 
 ### OpenRouter keys
 `admin_settings` rows (empty secrets):
@@ -108,8 +123,8 @@ UI: minimal author list/editor + public `/posts` (or `/blog`) list/detail. No se
 Resolution pattern (Marketing refs): `openrouter-key.ts` / `openrouter-key-server.ts` — BYOK → admin → env unless force platform. Hide `option_field_type = 'secret'` from anon/authenticated SELECT. Leave `app_settings.openrouter_model` as model id.
 
 ### Token ledger
-- Tables: `llm_models`, `llm_turn_rates` (parents: `message_id` **or** `automation_run_id` only — starter already has both).
-- Also ensure `messages.input_tokens` / `messages.output_tokens` (and automation_runs token cols if recording automations).
+- Tables: `llm_models`, `llm_turn_rates` (parent: `message_id`). The automations product is removed; do not require `automation_run_id` for new recording.
+- Also ensure `messages.input_tokens` / `messages.output_tokens`.
 - Write path: **only** `record_llm_turn_usage` with **10 args** (no `p_course_post_id`). Do **not** use `increment_user_token_usage*`.
 - Platform total = sum of `user_data` totals + `llm_models` aggregates (reporting).
 - Optional later: `get_my_llm_usage` / `admin_llm_usage_report` (Marketing versions, no course unions).
@@ -121,7 +136,7 @@ Columns on `user_data` only. Routes: checkout session create, customer portal, w
 ## Ordered implementation steps
 
 ### Phase 0 — Coordination
-- [ ] Rebase/merge awareness for PRs #11 and #12 before touching `handle_new_user` / `admin_settings` / `schema.sql`.
+- [ ] Do not edit `handle_new_user`, `admin_settings`, or `schema.sql` for this plan. PRs #11 and #12 own those overlaps.
 - [ ] Confirm Truman’s hold: schema files only; no live apply to `cyczlgdaocwueaacqxsh`.
 
 ### Phase 1 — Schema (migration + schema.sql sync)
@@ -135,7 +150,7 @@ Columns on `user_data` only. Routes: checkout session create, customer portal, w
 ### Phase 2 — OpenRouter key resolution + chat recording
 - [ ] Port thin TS helpers from Marketing key resolution (generic admin names only).
 - [ ] Wire existing chat persist path to insert assistant message then `rpc('record_llm_turn_usage', …)`.
-- [ ] Optionally wire automations the same way (same RPC, `p_automation_run_id`).
+- [ ] Do not wire automations. That product and its crons are removed.
 - [ ] Admin UI fields for the three OpenRouter settings (secret masking).
 
 ### Phase 3 — Profiles UI
@@ -171,8 +186,8 @@ Columns on `user_data` only. Routes: checkout session create, customer portal, w
 
 | Item | Note |
 |------|------|
-| Agent platform already on main | Chat/Agents/Skills/Templates/Automations + Documents may be **too much** for a thin local-business starter. **Leave as-is** in this plan; Truman can request a later strip plan. |
-| Dead `@paddle/*` deps | Hygiene cleanup optional; not Stripe. |
+| Cleanup already landed | Templates, automations, and crons are removed (#26–#29). Blog Phase A stays. Do not undo that in this plan. |
+| `@paddle/*` | Already removed from `package.json`. |
 | `user_settings.name` vs first/last | Prefer first/last already on starter. |
 | Model catalog seed | Empty catalog ⇒ usage still bumps user totals but skips model aggregates / rate row behavior per function rules — decide seed list at implement time. |
 | PRs #11/#12 unstable | Coordinate merges to avoid thrash. |
@@ -193,7 +208,7 @@ Columns on `user_data` only. Routes: checkout session create, customer portal, w
 | Stripe checkout/portal/webhook | course caps, separate stripe table |
 | `llm_models` + `llm_turn_rates` + `record_llm_turn_usage` | Edu course_post_id; `increment_user_token_usage*` |
 | Generic admin OpenRouter keys | `tech_edu_openrouter_*`, Marketing secret values |
-| Wire ledger into existing chat | New template catalogs / user_agents work |
+| Ledger wired into existing chat | Restoring template catalogs, automations, or crons |
 
 ## Handoff
 
