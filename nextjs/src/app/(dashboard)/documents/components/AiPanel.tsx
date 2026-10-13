@@ -10,6 +10,8 @@ interface Props {
   onClose: () => void
   doc: TipTapDoc
   onApply: (text: string) => void
+  presets?: string[]
+  purpose?: 'blog'
 }
 
 const PRESETS = [
@@ -19,7 +21,7 @@ const PRESETS = [
   'Suggest a short outline.',
 ]
 
-export function AiPanel({ open, onClose, doc, onApply }: Props) {
+export function AiPanel({ open, onClose, doc, onApply, presets = PRESETS, purpose }: Props) {
   const [prompt, setPrompt] = useState('')
   const [output, setOutput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -47,7 +49,7 @@ export function AiPanel({ open, onClose, doc, onApply }: Props) {
       const res = await fetch('/documents/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ doc, prompt: p }),
+        body: JSON.stringify({ doc, prompt: p, ...(purpose ? { purpose } : {}) }),
         signal: abortRef.current.signal,
       })
 
@@ -107,7 +109,7 @@ export function AiPanel({ open, onClose, doc, onApply }: Props) {
 
       <div className="flex-1 overflow-auto p-4 space-y-3">
         <div className="flex flex-wrap gap-1.5">
-          {PRESETS.map((preset) => (
+          {presets.map((preset) => (
             <button
               key={preset}
               type="button"

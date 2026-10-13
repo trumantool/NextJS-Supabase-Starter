@@ -41,9 +41,10 @@ import { ALLOWED_FONT_SIZES } from '../lib/font-size-extension'
 
 interface Props {
   editor: Editor | null
-  onExport: () => void
+  onExport?: () => void
   onOpenAi: () => void
   exporting?: boolean
+  onRequestImageUrl?: () => Promise<string | null>
 }
 
 function ToolButton({
@@ -105,7 +106,7 @@ function ExportButton({
   )
 }
 
-export function DocumentToolbar({ editor, onExport, onOpenAi, exporting }: Props) {
+export function DocumentToolbar({ editor, onExport, onOpenAi, exporting, onRequestImageUrl }: Props) {
   // Snapshots the editor text selection so the native color picker (which
   // steals focus) does not clear it before setColor() runs.
   const colorSelectionRef = useRef<{ from: number; to: number } | null>(null)
@@ -122,7 +123,13 @@ export function DocumentToolbar({ editor, onExport, onOpenAi, exporting }: Props
     ed.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
   }
 
-  function insertImage() {
+  async function insertImage() {
+    if (onRequestImageUrl) {
+      const url = await onRequestImageUrl()
+      if (!url) return
+      ed.chain().focus().setImage({ src: url }).run()
+      return
+    }
     const url = promptForUrl('Enter image URL')
     if (!url) return
     ed.chain().focus().setImage({ src: url }).run()
@@ -442,7 +449,7 @@ export function DocumentToolbar({ editor, onExport, onOpenAi, exporting }: Props
         <Trash2 className="h-4 w-4" />
       </ToolButton>
 
-      <ToolButton title="Insert image" onClick={insertImage}>
+      <ToolButton title="Insert image" onClick={() => void insertImage()}>
         <ImageIcon className="h-4 w-4" />
       </ToolButton>
 
@@ -456,7 +463,7 @@ export function DocumentToolbar({ editor, onExport, onOpenAi, exporting }: Props
         <Sparkles className="h-4 w-4" />
         AI
       </button>
-      <ExportButton onClick={onExport} exporting={exporting} />
+      {onExport ? <ExportButton onClick={onExport} exporting={exporting} /> : null}
     </div>
   )
 }

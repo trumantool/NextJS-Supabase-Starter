@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { useGlobal } from '@/lib/context/GlobalContext'
+import type { BuiltinSkillDescriptor } from '@/lib/builtin-agents'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -40,20 +41,20 @@ import { SkillPreviewDialog } from './SkillPreviewDialog'
 import { createSPASassClientAuthenticated as createSPASassClient } from '@/lib/supabase/client'
 import {
   deleteAgentSkill,
-  deleteSharedAgentSkill,
   importAgentSkillFromGithub,
-  importSharedAgentSkillFromGithub,
+  previewAgentSkill,
+  previewBuiltinSkill,
   uploadAgentSkill,
-  uploadSharedAgentSkill,
   type AgentSkillRow,
 } from './actions'
 
 type TabId = 'shared' | 'mine'
 
 export default function AgentSkillsPage() {
-  const { user, isAdmin } = useGlobal()
+  const { user } = useGlobal()
   const [tab, setTab] = useState<TabId>('shared')
   const [skills, setSkills] = useState<AgentSkillRow[]>([])
+  const [builtinSkills, setBuiltinSkills] = useState<BuiltinSkillDescriptor[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -64,8 +65,6 @@ export default function AgentSkillsPage() {
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [uploadName, setUploadName] = useState('')
   const [uploadDescription, setUploadDescription] = useState('')
-  const [writeShared, setWriteShared] = useState(false)
-
   const [showGithubDialog, setShowGithubDialog] = useState(false)
   const [githubUrl, setGithubUrl] = useState('')
   const [githubName, setGithubName] = useState('')
@@ -74,9 +73,10 @@ export default function AgentSkillsPage() {
 
   const [skillToDelete, setSkillToDelete] = useState<AgentSkillRow | null>(null)
   const [skillToView, setSkillToView] = useState<AgentSkillRow | null>(null)
+  const [builtinPreview, setBuiltinPreview] = useState<{ name: string; text: string } | null>(null)
 
   const shared = tab === 'shared'
-  const canWrite = shared ? isAdmin : Boolean(user?.id)
+  const canWrite = !shared && Boolean(user?.id)
 
   const seedFolderAndLoad = useCallback(async () => {
     try {
@@ -88,7 +88,10 @@ export default function AgentSkillsPage() {
       }
       const { data, error: listError } = await supabase.listAgentSkills()
       if (listError) throw listError
-      setSkills(data || [])
+      setSkills((data || []).filter((skill) => skill.user_id === user?.id))
+      const builtinRes = await fetch('/api/agent-skills', { cache: 'no-store' })
+      const builtinJson = (await builtinRes.json()) as { builtinSkills?: BuiltinSkillDescriptor[] }
+      if (builtinRes.ok) setBuiltinSkills(builtinJson.builtinSkills || [])
     } catch (err) {
       console.error('Error loading skills:', err)
       setError('Failed to load skills')
@@ -103,18 +106,13 @@ export default function AgentSkillsPage() {
     }
   }, [user?.id, seedFolderAndLoad])
 
-  const visibleSkills = skills.filter((skill) =>
-    shared ? skill.user_id === null : skill.user_id === user?.id
-  )
-
   const openUploadDialog = useCallback((file: File) => {
     if (!canWrite) return
-    setWriteShared(shared)
     setPendingFile(file)
     setUploadName('')
     setUploadDescription('')
     setShowUploadDialog(true)
-  }, [canWrite, shared])
+  }, [canWrite])
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = event.target.files
@@ -144,9 +142,7 @@ export default function AgentSkillsPage() {
       formData.set('file', pendingFile)
       formData.set('skill_name', uploadName)
       formData.set('skill_description', uploadDescription)
-      const result = writeShared
-        ? await uploadSharedAgentSkill(formData)
-        : await uploadAgentSkill(formData)
+      const result = await uploadAgentSkill(formData)
       if (!result.success) {
         setError(result.message)
         return
@@ -176,9 +172,7 @@ export default function AgentSkillsPage() {
         skill_name: githubName,
         skill_description: githubDescription,
       }
-      const result = writeShared
-        ? await importSharedAgentSkillFromGithub(payload)
-        : await importAgentSkillFromGithub(payload)
+      const result = await importAgentSkillFromGithub(payload)
       if (!result.success) {
         setError(result.message)
         return
@@ -200,10 +194,15 @@ export default function AgentSkillsPage() {
   const handleDownload = async (skill: AgentSkillRow) => {
     try {
       setError('')
-      const supabase = await createSPASassClient()
-      const { data, error: signError } = await supabase.signAgentSkillUrl(skill.skill_url, 60, true)
-      if (signError || !data?.signedUrl) throw signError || new Error('No signed URL')
-      window.open(data.signedUrl, '_blank')
+      const result = await previewAgentSkill(skill.id)
+      if (!result.success || !result.data) throw new Error(result.message)
+      const blob = new Blob([result.data.text], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${skill.skill_name || 'skill'}.md`
+      anchor.click()
+      URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Error downloading skill:', err)
       setError('Failed to open skill file')
@@ -214,9 +213,7 @@ export default function AgentSkillsPage() {
     if (!skillToDelete) return
     try {
       setError('')
-      const result = writeShared
-        ? await deleteSharedAgentSkill(skillToDelete.id)
-        : await deleteAgentSkill(skillToDelete.id)
+      const result = await deleteAgentSkill(skillToDelete.id)
       if (!result.success) {
         setError(result.message)
         return
@@ -237,8 +234,9 @@ export default function AgentSkillsPage() {
         <CardHeader>
           <CardTitle>Skills Library</CardTitle>
           <CardDescription>
-            Markdown instructions agents can attach. Shared skills are readable by everyone;
-            your skills stay under <code>{'{auth.uid()}/'}</code> in the agent-skills bucket.
+            Built-in Task Management skills are always on for that agent and cannot be edited.
+            Skills you upload on Mine can be attached to General agent and Task Management.
+            Plain General chat does not load them.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -269,7 +267,7 @@ export default function AgentSkillsPage() {
                     : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                 }`}
               >
-                Shared
+                Built-in
               </button>
               <button
                 type="button"
@@ -323,7 +321,6 @@ export default function AgentSkillsPage() {
                 type="button"
                 onClick={() => {
                   setError('')
-                  setWriteShared(shared)
                   setShowGithubDialog(true)
                 }}
                 className="sm:w-56 flex flex-col items-center justify-center px-4 py-6 bg-white rounded-lg border-2 border-gray-300 hover:bg-gray-50"
@@ -334,7 +331,7 @@ export default function AgentSkillsPage() {
             </div>
           ) : (
             <p className="text-sm text-gray-500">
-              Shared skills are read-only. Only admins can add or remove default skills.
+              Built-in task skills are read-only. Upload and GitHub import stay on Mine.
             </p>
           )}
 
@@ -344,63 +341,88 @@ export default function AgentSkillsPage() {
                 <Loader2 className="w-6 h-6 animate-spin" />
               </div>
             ) : null}
-            {!loading && visibleSkills.length === 0 ? (
-              <p className="text-center text-gray-500">
-                {shared ? 'No shared skills yet' : 'No personal skills yet'}
-              </p>
-            ) : null}
-            {visibleSkills.map((skill) => (
-              <div key={skill.id} className="p-4 bg-white rounded-lg border">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <FileIcon className="mt-0.5 h-6 w-6 shrink-0 text-gray-400" />
-                    <div className="min-w-0 flex-1">
-                      <span className="block font-medium break-words">{skill.skill_name}</span>
-                      {skill.skill_description ? (
-                        <p className="mt-1 line-clamp-2 break-words text-sm text-gray-500">
-                          {skill.skill_description}
-                        </p>
-                      ) : null}
-                      <p className="mt-1 truncate text-xs text-gray-400">
-                        {skill.source === 'github' ? 'Imported from GitHub' : 'Uploaded'}
-                        {skill.source_url ? ` · ${skill.source_url}` : ''}
-                      </p>
+            {shared ? (
+              builtinSkills.map((skill) => (
+                <div key={skill.slug} className="p-4 bg-white rounded-lg border">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <span className="block font-medium break-words">{skill.name}</span>
+                      <p className="mt-1 text-sm text-gray-500">{skill.description}</p>
+                      <p className="mt-1 text-xs text-gray-400">Built-in · read-only</p>
                     </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1 sm:shrink-0">
                     <button
                       type="button"
-                      onClick={() => setSkillToView(skill)}
+                      onClick={() => {
+                        void previewBuiltinSkill(skill.slug).then((result) => {
+                          if (!result.success || !result.data) {
+                            setError(result.message)
+                            return
+                          }
+                          setBuiltinPreview({ name: result.data.name, text: result.data.text })
+                        })
+                      }}
                       className="inline-flex min-h-11 touch-manipulation items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium text-primary-600 transition-colors hover:bg-primary-50"
                     >
                       <Eye className="h-4 w-4" />
                       View
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDownload(skill)}
-                      className="inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full text-blue-600 hover:bg-blue-50"
-                      aria-label={`Download ${skill.skill_name}`}
-                    >
-                      <Download className="h-5 w-5" />
-                    </button>
-                    {canWrite ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setWriteShared(shared)
-                          setSkillToDelete(skill)
-                        }}
-                        className="inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full text-red-600 hover:bg-red-50"
-                        aria-label={`Delete ${skill.skill_name}`}
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    ) : null}
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <>
+                {!loading && skills.length === 0 ? (
+                  <p className="text-center text-gray-500">No personal skills yet</p>
+                ) : null}
+                {skills.map((skill) => (
+                  <div key={skill.id} className="p-4 bg-white rounded-lg border">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <FileIcon className="mt-0.5 h-6 w-6 shrink-0 text-gray-400" />
+                        <div className="min-w-0 flex-1">
+                          <span className="block font-medium break-words">{skill.skill_name}</span>
+                          {skill.skill_description ? (
+                            <p className="mt-1 line-clamp-2 break-words text-sm text-gray-500">
+                              {skill.skill_description}
+                            </p>
+                          ) : null}
+                          <p className="mt-1 truncate text-xs text-gray-400">
+                            {skill.source === 'github' ? 'Imported from GitHub' : 'Uploaded'}
+                            {skill.source_url ? ` · ${skill.source_url}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1 sm:shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setSkillToView(skill)}
+                          className="inline-flex min-h-11 touch-manipulation items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium text-primary-600 transition-colors hover:bg-primary-50"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDownload(skill)}
+                          className="inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full text-blue-600 hover:bg-blue-50"
+                          aria-label={`Download ${skill.skill_name}`}
+                        >
+                          <Download className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSkillToDelete(skill)}
+                          className="inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full text-red-600 hover:bg-red-50"
+                          aria-label={`Delete ${skill.skill_name}`}
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -481,6 +503,20 @@ export default function AgentSkillsPage() {
           if (!nextOpen) setSkillToView(null)
         }}
       />
+
+      <Dialog open={Boolean(builtinPreview)} onOpenChange={(nextOpen) => { if (!nextOpen) setBuiltinPreview(null) }}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{builtinPreview?.name ?? 'Built-in skill'}</DialogTitle>
+            <DialogDescription>Read-only. This file cannot be deleted.</DialogDescription>
+          </DialogHeader>
+          {builtinPreview ? (
+            <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm text-gray-700">
+              {builtinPreview.text}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={Boolean(skillToDelete)}

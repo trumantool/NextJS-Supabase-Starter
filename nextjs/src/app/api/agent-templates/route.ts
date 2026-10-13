@@ -1,13 +1,14 @@
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createSSRClient } from '@/lib/supabase/server'
-import { isAdminUser, withBuiltinStarter } from '@/lib/agent-templates'
+import { withBuiltinStarter } from '@/lib/agent-templates'
+import { filterVisibleTemplates } from '@/lib/starter-catalog-allowlist'
 
 /**
  * GET /api/agent-templates
- * Published catalog for every signed-in user.
- * Admins may pass ?status=all to include drafts.
+ * Returns at most the code General template. Database recipes stay hidden,
+ * including when ?status=all is passed.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createSSRClient()
     const {
@@ -18,25 +19,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const wantAll = request.nextUrl.searchParams.get('status') === 'all'
-    const admin = wantAll ? await isAdminUser(supabase, user.id) : false
-
-    let query = supabase
+    const { data, error } = await supabase
       .from('agent_templates')
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (!admin) {
-      query = query.eq('status', 'published')
-    }
-
-    const { data, error } = await query
     if (error) {
       console.error('Failed to fetch agent templates:', error)
       return NextResponse.json({ error: 'Failed to fetch templates' }, { status: 500 })
     }
 
-    return NextResponse.json({ templates: withBuiltinStarter(data || []) })
+    return NextResponse.json({ templates: withBuiltinStarter(filterVisibleTemplates(data || [])) })
   } catch (err) {
     console.error('Agent templates GET error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

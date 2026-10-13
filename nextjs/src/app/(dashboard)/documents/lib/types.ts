@@ -75,6 +75,8 @@ export interface AiRequest {
   prompt: string
   /** Optional model override; falls back to app_settings. */
   model?: string
+  /** Blog posts use a different system prompt. Documents omit this. */
+  purpose?: 'blog'
 }
 
 /** A streamed chunk from the AI route (SSE). */

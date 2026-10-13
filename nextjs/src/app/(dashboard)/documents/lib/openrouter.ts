@@ -30,9 +30,15 @@ export async function listOpenRouterModels(): Promise<OpenRouterModel[]> {
   return json.data ?? []
 }
 
+export type OpenRouterUsage = {
+  inputTokens: number
+  outputTokens: number
+}
+
 /**
  * Stream a chat completion from OpenRouter.
- * Calls `onChunk` for each text delta. Returns the full text when done.
+ * Calls `onChunk` for each text delta. Returns the full text and token usage.
+ * Usage is present when OpenRouter sends a usage chunk (`stream_options.include_usage`).
  */
 export async function streamChatCompletion(opts: {
   model: string
@@ -40,7 +46,7 @@ export async function streamChatCompletion(opts: {
   onChunk: (delta: string) => void
   signal?: AbortSignal
   userId?: string
-}): Promise<string> {
+}): Promise<{ text: string; usage: OpenRouterUsage }> {
   const { model, messages, onChunk, signal, userId } = opts
   const key = await getOpenRouterKey(userId)
 
@@ -54,6 +60,7 @@ export async function streamChatCompletion(opts: {
       model,
       messages,
       stream: true,
+      stream_options: { include_usage: true },
     }),
     signal,
   })
@@ -67,6 +74,7 @@ export async function streamChatCompletion(opts: {
   const decoder = new TextDecoder()
   let buffer = ''
   let full = ''
+  const usage: OpenRouterUsage = { inputTokens: 0, outputTokens: 0 }
 
   while (true) {
     const { done, value } = await reader.read()
@@ -84,11 +92,25 @@ export async function streamChatCompletion(opts: {
       if (payload === '[DONE]') continue
 
       try {
-        const json = JSON.parse(payload)
+        const json = JSON.parse(payload) as {
+          choices?: Array<{ delta?: { content?: unknown } }>
+          usage?: {
+            prompt_tokens?: number
+            completion_tokens?: number
+            input_tokens?: number
+            output_tokens?: number
+          }
+        }
         const delta = json?.choices?.[0]?.delta?.content
         if (typeof delta === 'string' && delta.length > 0) {
           full += delta
           onChunk(delta)
+        }
+        if (json.usage) {
+          const input = json.usage.prompt_tokens ?? json.usage.input_tokens
+          const output = json.usage.completion_tokens ?? json.usage.output_tokens
+          if (typeof input === 'number') usage.inputTokens = input
+          if (typeof output === 'number') usage.outputTokens = output
         }
       } catch {
         // ignore malformed chunk
@@ -96,7 +118,7 @@ export async function streamChatCompletion(opts: {
     }
   }
 
-  return full
+  return { text: full, usage }
 }
 
 export { DEFAULT_MODEL }

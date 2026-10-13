@@ -3,6 +3,7 @@
 // Documents — Word-like TipTap editor.
 import { useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
+import type { Extensions } from '@tiptap/core'
 import { documentExtensions } from '../lib/editor-schema'
 import type { TipTapDoc } from '../lib/types'
 import { DocumentToolbar } from './DocumentToolbar'
@@ -11,9 +12,12 @@ import { EditorContextMenu } from './EditorContextMenu'
 interface Props {
   initialDoc: TipTapDoc
   onDocChange: (doc: TipTapDoc) => void
-  onExport: () => void
+  onExport?: () => void
   onOpenAi: () => void
   exporting?: boolean
+  onRequestImageUrl?: () => Promise<string | null>
+  /** Defaults to the document schema. Blog posts pass the YouTube extension too. */
+  extensions?: Extensions
 }
 
 function countsFromDoc(doc: TipTapDoc) {
@@ -45,6 +49,8 @@ export function DocumentEditor({
   onExport,
   onOpenAi,
   exporting,
+  onRequestImageUrl,
+  extensions = documentExtensions,
 }: Props) {
   const onDocChangeRef = useRef(onDocChange)
   onDocChangeRef.current = onDocChange
@@ -52,7 +58,7 @@ export function DocumentEditor({
   const [counts, setCounts] = useState(() => countsFromDoc(initialDoc))
 
   const editor = useEditor({
-    extensions: documentExtensions,
+    extensions,
     content: initialDoc,
     editorProps: {
       attributes: {
@@ -83,6 +89,7 @@ export function DocumentEditor({
         onExport={onExport}
         onOpenAi={onOpenAi}
         exporting={exporting}
+        onRequestImageUrl={onRequestImageUrl}
       />
       <div className="flex-1 overflow-auto bg-gray-100 p-4 sm:p-8">
         <div className="mx-auto max-w-[8.5in] bg-white shadow-lg rounded-sm min-h-[11in]">

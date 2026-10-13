@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { modelIdFromDefaults } from '@/lib/agent-templates'
 import { getValidChatModel, streamChatCompletion } from '@/lib/chat-openrouter'
+import { recordLlmTurnUsage } from '@/lib/llm-usage'
 import { loadAgentSkills } from '@/lib/load-agent-skills'
 import type { Automation, AutomationRun } from '@/lib/types'
 
@@ -120,17 +121,16 @@ export async function executeQueuedRun(opts: {
   }
 
   try {
-    const text = (
-      await streamChatCompletion({
-        model: modelId,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: typedAuto.prompt },
-        ],
-        onChunk: () => {},
-        userId,
-      })
-    ).trim()
+    const result = await streamChatCompletion({
+      model: modelId,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: typedAuto.prompt },
+      ],
+      onChunk: () => {},
+      userId,
+    })
+    const text = result.text.trim()
 
     const transcript =
       text ||
@@ -148,6 +148,13 @@ export async function executeQueuedRun(opts: {
         finished_at: new Date().toISOString(),
       })
       .eq('id', runId)
+
+    await recordLlmTurnUsage(supabase, {
+      userId,
+      modelId,
+      usage: result.usage,
+      automationRunId: runId,
+    })
   } catch (err) {
     console.error('executeQueuedRun failed:', err)
     const message = err instanceof Error ? err.message : 'Run failed'

@@ -24,11 +24,13 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { id?: string; value?: string }
+    const body = (await request.json()) as { id?: string; value?: string; clearSecret?: boolean }
     if (!body.id) {
       return NextResponse.json({ error: 'Setting id is required.' }, { status: 400 })
     }
-    const updated = await updateAdminSetting(body.id, body.value ?? '')
+    const updated = await updateAdminSetting(body.id, body.value ?? '', {
+      clearSecret: body.clearSecret === true,
+    })
     return NextResponse.json({ success: true, setting: updated }, { status: 200 })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to save setting'
