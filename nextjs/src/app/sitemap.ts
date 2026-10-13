@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { listAuthorLinks, listCategoryLinks } from '@/lib/blog-taxonomy'
 import { publicSiteOrigin } from '@/lib/blog-seo'
+import { settlePublicBlog } from '@/lib/posts'
 import { listPublishedPosts } from '@/lib/posts-store'
 
 export const dynamic = 'force-dynamic'
@@ -10,9 +11,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (!origin) return []
 
   const [posts, categories, authors] = await Promise.all([
-    listPublishedPosts(),
-    listCategoryLinks(),
-    listAuthorLinks(),
+    settlePublicBlog('sitemap posts', () => listPublishedPosts(), []),
+    settlePublicBlog('sitemap categories', () => listCategoryLinks(), []),
+    settlePublicBlog('sitemap authors', () => listAuthorLinks(), []),
   ])
 
   const staticPaths = ['/', '/posts']

@@ -1,12 +1,15 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { isUuid } from '@/lib/ids'
+import { ensureBuiltinUserAgent, parseBuiltinSelection } from '@/lib/builtin-agents'
+import { createBlankUserAgent } from '@/lib/clone-user-agent'
+import {
+  filterVisibleUserAgents,
+  isRejectedTemplateClone,
+} from '@/lib/starter-catalog-allowlist'
 import { createSSRClient } from '@/lib/supabase/server'
-import { isAdminUser, STARTER_TEMPLATE_SLUG } from '@/lib/agent-templates'
-import { cloneTemplateToUserAgent, createBlankUserAgent } from '@/lib/clone-user-agent'
 
 /**
  * GET /api/agents
- * Current user's agents, newest first.
+ * Current user's visible agents, newest first. Marketing clones are omitted.
  */
 export async function GET() {
   try {
@@ -30,7 +33,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch agents' }, { status: 500 })
     }
 
-    return NextResponse.json({ agents: data || [] })
+    return NextResponse.json({ agents: filterVisibleUserAgents(data || []) })
   } catch (err) {
     console.error('Agents GET error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -39,7 +42,8 @@ export async function GET() {
 
 /**
  * POST /api/agents
- * Create a blank agent, or clone a catalog / built-in starter template.
+ * Create a blank agent, or ensure the caller's General / Task Management row.
+ * Template clones are rejected and insert nothing.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -55,6 +59,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json().catch(() => ({}))) as {
       template_id?: unknown
       starter?: unknown
+      builtin?: unknown
       name?: unknown
       system_prompt?: unknown
       skill_ids?: unknown
@@ -62,48 +67,36 @@ export async function POST(request: NextRequest) {
       model_id?: unknown
     }
 
-    const admin = await isAdminUser(supabase, user.id)
-    const shared = {
+    if (isRejectedTemplateClone(body)) {
+      return NextResponse.json(
+        { error: 'Templates cannot be cloned. Create a blank agent or pick General agent or Task Management.' },
+        { status: 400 }
+      )
+    }
+
+    const builtin = parseBuiltinSelection(body.builtin)
+    if (body.builtin !== undefined && !builtin) {
+      return NextResponse.json(
+        { error: 'builtin must be general or task-management.' },
+        { status: 400 }
+      )
+    }
+
+    if (builtin) {
+      const result = await ensureBuiltinUserAgent(supabase, user.id, builtin)
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: result.status })
+      }
+      return NextResponse.json({ agent: result.agent }, { status: 200 })
+    }
+
+    const result = await createBlankUserAgent(supabase, {
       userId: user.id,
-      name: body.name,
+      name: body.name || 'Untitled agent',
       system_prompt: body.system_prompt,
       skill_ids: body.skill_ids,
       defaults: body.defaults,
       model_id: body.model_id,
-    }
-
-    if (body.starter === true || body.template_id === STARTER_TEMPLATE_SLUG) {
-      const result = await cloneTemplateToUserAgent(supabase, {
-        ...shared,
-        templateId: STARTER_TEMPLATE_SLUG,
-        name: body.name || 'Starter Assistant',
-        allowUnpublished: admin,
-      })
-      if (!result.ok) {
-        return NextResponse.json({ error: result.error }, { status: result.status })
-      }
-      return NextResponse.json({ agent: result.agent }, { status: 201 })
-    }
-
-    if (typeof body.template_id === 'string') {
-      if (!isUuid(body.template_id)) {
-        return NextResponse.json({ error: 'template_id must be a valid UUID.' }, { status: 400 })
-      }
-      const result = await cloneTemplateToUserAgent(supabase, {
-        ...shared,
-        templateId: body.template_id,
-        name: body.name || 'Untitled agent',
-        allowUnpublished: admin,
-      })
-      if (!result.ok) {
-        return NextResponse.json({ error: result.error }, { status: result.status })
-      }
-      return NextResponse.json({ agent: result.agent }, { status: 201 })
-    }
-
-    const result = await createBlankUserAgent(supabase, {
-      ...shared,
-      name: body.name || 'Untitled agent',
     })
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status })

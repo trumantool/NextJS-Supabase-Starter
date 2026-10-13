@@ -227,7 +227,8 @@ COMMENT ON COLUMN public.user_settings.openrouter_api_key IS
 
 CREATE TABLE IF NOT EXISTS public.admin_settings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  option_name text NOT NULL UNIQUE,
+  app_key text,
+  option_name text NOT NULL,
   option_value text NOT NULL DEFAULT '',
   option_field_type text NOT NULL DEFAULT 'text',
   option_title text NOT NULL,
@@ -235,6 +236,21 @@ CREATE TABLE IF NOT EXISTS public.admin_settings (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+COMMENT ON COLUMN public.admin_settings.app_key IS
+  'Deployment scope for a shared database. NULL is the single-app starter (ADMIN_SETTINGS_APP_KEY unset).';
+
+-- Upgrade path for a database created before app_key, and a second paste of
+-- this file. NULLS NOT DISTINCT keeps one row per option_name when app_key is NULL.
+ALTER TABLE public.admin_settings ADD COLUMN IF NOT EXISTS app_key text;
+
+ALTER TABLE public.admin_settings DROP CONSTRAINT IF EXISTS admin_settings_option_name_key;
+
+ALTER TABLE public.admin_settings DROP CONSTRAINT IF EXISTS admin_settings_app_key_option_name_key;
+
+ALTER TABLE public.admin_settings
+  ADD CONSTRAINT admin_settings_app_key_option_name_key
+  UNIQUE NULLS NOT DISTINCT (app_key, option_name);
 
 CREATE TABLE IF NOT EXISTS public.app_settings (
   key text PRIMARY KEY,
@@ -887,10 +903,13 @@ BEGIN
   WHERE id = v_model_id;
 
   IF p_markup IS NULL THEN
+    -- NULL app_key is the unset ADMIN_SETTINGS_APP_KEY scope. A clone that sets
+    -- a key passes p_markup from the app so this fallback does not read another row.
     SELECT option_value
     INTO v_markup_text
     FROM public.admin_settings
-    WHERE option_name = 'openrouter_cost_markup';
+    WHERE option_name = 'openrouter_cost_markup'
+      AND app_key IS NULL;
 
     IF v_markup_text IS NOT NULL AND btrim(v_markup_text) ~ '^-?[0-9]+(\.[0-9]+)?$' THEN
       v_markup := btrim(v_markup_text)::numeric;
@@ -932,9 +951,9 @@ COMMENT ON FUNCTION public.record_llm_turn_usage(
 ) IS
   'Record one LLM turn. 10 arguments. No course_post_id. Always bumps user_data totals. Updates llm_models and inserts llm_turn_rates only when the model id is already in the catalog.';
 
-REVOKE ALL ON FUNCTION public.record_llm_turn_usage(
+REVOKE EXECUTE ON FUNCTION public.record_llm_turn_usage(
   uuid, text, bigint, bigint, uuid, uuid, numeric, numeric, numeric, text
-) FROM PUBLIC, anon;
+) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.record_llm_turn_usage(
   uuid, text, bigint, bigint, uuid, uuid, numeric, numeric, numeric, text
@@ -948,6 +967,7 @@ CREATE INDEX IF NOT EXISTS idx_user_data_created_at ON public.user_data (created
 CREATE INDEX IF NOT EXISTS idx_user_data_user_role ON public.user_data (user_role);
 CREATE INDEX IF NOT EXISTS idx_user_settings_created_at ON public.user_settings (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_admin_settings_option_name ON public.admin_settings (option_name);
+CREATE INDEX IF NOT EXISTS idx_admin_settings_app_key ON public.admin_settings (app_key);
 CREATE INDEX IF NOT EXISTS idx_admin_settings_created_at ON public.admin_settings (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_roles_sort_order ON public.user_roles (sort_order);
 
@@ -1254,29 +1274,56 @@ ON public.user_roles FOR ALL TO service_role
 USING (true) WITH CHECK (true);
 
 -- admin_settings
--- Non-secret rows are public (site title, legal shortcodes, markup flag).
--- option_field_type = secret is hidden from anon and authenticated SELECT.
--- Secret writes use the service role after an admin check.
+-- Non-secret, non-password rows stay public (site title, contact info,
+-- privacy and terms, login_redirect_url, markup flag, and similar).
+-- secret and password rows are hidden from anon and authenticated SELECT.
+-- admin_settings_select_public does not call is_admin() or any SECURITY DEFINER.
+-- There is no admin_settings_select_admin policy: authenticated SELECT must
+-- not return secret or password values. The admin UI reads those rows with
+-- the service role after an application is_admin check, then blanks them.
+DROP POLICY IF EXISTS "Admin settings are readable by anyone" ON public.admin_settings;
 DROP POLICY IF EXISTS "Public can read non-secret admin settings" ON public.admin_settings;
-CREATE POLICY "Public can read non-secret admin settings"
+DROP POLICY IF EXISTS admin_settings_select_public ON public.admin_settings;
+DROP POLICY IF EXISTS admin_settings_select_admin ON public.admin_settings;
+
+CREATE POLICY admin_settings_select_public
 ON public.admin_settings FOR SELECT TO anon, authenticated
-USING (option_field_type IS DISTINCT FROM 'secret');
+USING (
+  option_field_type IS DISTINCT FROM 'secret'
+  AND option_field_type IS DISTINCT FROM 'password'
+);
 
 DROP POLICY IF EXISTS "Admins can insert admin settings" ON public.admin_settings;
 CREATE POLICY "Admins can insert admin settings"
 ON public.admin_settings FOR INSERT TO authenticated
-WITH CHECK (authenticative.is_admin());
+WITH CHECK (
+  authenticative.is_admin()
+  AND option_field_type IS DISTINCT FROM 'secret'
+  AND option_field_type IS DISTINCT FROM 'password'
+);
 
 DROP POLICY IF EXISTS "Admins can update admin settings" ON public.admin_settings;
 CREATE POLICY "Admins can update admin settings"
 ON public.admin_settings FOR UPDATE TO authenticated
-USING (authenticative.is_admin())
-WITH CHECK (authenticative.is_admin());
+USING (
+  authenticative.is_admin()
+  AND option_field_type IS DISTINCT FROM 'secret'
+  AND option_field_type IS DISTINCT FROM 'password'
+)
+WITH CHECK (
+  authenticative.is_admin()
+  AND option_field_type IS DISTINCT FROM 'secret'
+  AND option_field_type IS DISTINCT FROM 'password'
+);
 
 DROP POLICY IF EXISTS "Admins can delete admin settings" ON public.admin_settings;
 CREATE POLICY "Admins can delete admin settings"
 ON public.admin_settings FOR DELETE TO authenticated
-USING (authenticative.is_admin());
+USING (
+  authenticative.is_admin()
+  AND option_field_type IS DISTINCT FROM 'secret'
+  AND option_field_type IS DISTINCT FROM 'password'
+);
 
 DROP POLICY IF EXISTS "Service role can manage admin_settings" ON public.admin_settings;
 CREATE POLICY "Service role can manage admin_settings"
@@ -1969,7 +2016,7 @@ VALUES
   ('phone_number', '', 'text', 'Phone Number', 'Available as the [phone_number] shortcode.'),
   ('privacy_policy', '<h1>Privacy Policy</h1><p>This Privacy Policy explains how [site_title] ("we", "us", or "our") collects, uses, discloses, and safeguards your information when you use our services.</p>', 'textarea', 'Privacy Policy', 'The privacy policy content shown on the /privacy page. Supports shortcodes like [site_title], [company_name], and [support_email].'),
   ('terms_of_service', '<h1>Terms of Service</h1><p>Welcome to [site_title] ("we", "us", or "our"). By accessing or using our services, you agree to be bound by these Terms of Service.</p>', 'textarea', 'Terms of Service', 'The Terms of Service content shown on the /terms page. Supports shortcodes like [site_title], [company_name], and [support_email].')
-ON CONFLICT (option_name) DO NOTHING;
+ON CONFLICT (app_key, option_name) DO NOTHING;
 
 INSERT INTO public.app_settings (key, value)
 VALUES ('openrouter_model', '"poolside/laguna-s-2.1:free"')
@@ -2004,7 +2051,7 @@ VALUES
     'OpenRouter cost markup',
     'Markup stored on llm_turn_rates when a turn is recorded. 0 means no markup. Not a secret.'
   )
-ON CONFLICT (option_name) DO NOTHING;
+ON CONFLICT (app_key, option_name) DO NOTHING;
 
 -- ============================================================================
 -- 12. BLOG TAXONOMY AND AUTHORS

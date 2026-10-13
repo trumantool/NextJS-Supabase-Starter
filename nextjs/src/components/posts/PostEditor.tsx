@@ -3,18 +3,38 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { generateHTML, generateJSON } from '@tiptap/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { DocumentEditor } from '@/app/(dashboard)/documents/components/DocumentEditor'
 import { AiPanel } from '@/app/(dashboard)/documents/components/AiPanel'
 import type { TipTapDoc } from '@/app/(dashboard)/documents/lib/types'
 import { docFromBody, isTipTapDoc } from '@/lib/blog-doc'
+import { blogExtensions } from '@/lib/blog/youtube-extension'
+import { youtubeVideoId } from '@/lib/blog/youtube'
 import type { Post } from '@/lib/types'
 
 const BLOG_PRESETS = ['Draft an introduction', 'Shorten this', 'Add a heading']
 
-type EditorProps = { mode: 'new' | 'edit'; postId?: string }
+type EditorProps = { mode: 'new' | 'edit'; postId?: string; backHref: string }
+
+type LoadedPost = Post & {
+  seo_title?: string | null
+  meta_description?: string | null
+  og_image_url?: string | null
+}
 
 function toLocalInput(iso: string | null): string {
   if (!iso) return ''
@@ -24,7 +44,7 @@ function toLocalInput(iso: string | null): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-export function PostEditor({ mode, postId }: EditorProps) {
+export function PostEditor({ mode, postId, backHref }: EditorProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(mode === 'edit')
   const [saving, setSaving] = useState(false)
@@ -32,7 +52,13 @@ export function PostEditor({ mode, postId }: EditorProps) {
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
   const [summary, setSummary] = useState('')
+  const [seoTitle, setSeoTitle] = useState('')
+  const [metaDescription, setMetaDescription] = useState('')
+  const [ogImageUrl, setOgImageUrl] = useState('')
   const [doc, setDoc] = useState<TipTapDoc>(() => docFromBody(''))
+  const [view, setView] = useState<'visual' | 'html'>('visual')
+  const [html, setHtml] = useState('')
+  const [youtubeDraft, setYoutubeDraft] = useState('')
   const [aiOpen, setAiOpen] = useState(false)
   const [status, setStatus] = useState<'draft' | 'published'>('draft')
   const [videoUrl, setVideoUrl] = useState('')
@@ -49,7 +75,7 @@ export function PostEditor({ mode, postId }: EditorProps) {
       try {
         const res = await fetch(`/api/posts/${postId}`)
         const data = (await res.json()) as {
-          post?: Post
+          post?: LoadedPost
           categories?: string[]
           tags?: string[]
           error?: string
@@ -60,6 +86,9 @@ export function PostEditor({ mode, postId }: EditorProps) {
         setTitle(post.title)
         setSlug(post.slug)
         setSummary(post.summary ?? '')
+        setSeoTitle(post.seo_title ?? '')
+        setMetaDescription(post.meta_description ?? '')
+        setOgImageUrl(post.og_image_url ?? '')
         setDoc(isTipTapDoc(post.body_doc) ? post.body_doc : docFromBody(post.body))
         setStatus(post.status === 'published' ? 'published' : 'draft')
         setVideoUrl(post.video_url ?? '')
@@ -80,6 +109,13 @@ export function PostEditor({ mode, postId }: EditorProps) {
     }
   }, [mode, postId])
 
+  function documentForSave(): TipTapDoc {
+    if (view !== 'html') return doc
+    const next = generateJSON(html, blogExtensions)
+    if (!isTipTapDoc(next)) throw new Error('HTML could not be read as a document')
+    return next
+  }
+
   function payload(action: 'draft' | 'publish' | 'schedule' | 'unpublish') {
     let nextStatus: 'draft' | 'published' = 'draft'
     let published_at: string | undefined
@@ -98,7 +134,10 @@ export function PostEditor({ mode, postId }: EditorProps) {
       title,
       slug,
       summary,
-      body_doc: doc,
+      seo_title: seoTitle,
+      meta_description: metaDescription,
+      og_image_url: ogImageUrl,
+      body_doc: documentForSave(),
       type: 'blog',
       status: nextStatus,
       published_at,
@@ -121,13 +160,49 @@ export function PostEditor({ mode, postId }: EditorProps) {
       })
       const data = (await res.json()) as { post?: Post; error?: string }
       if (!res.ok || !data.post) throw new Error(data.error || 'Failed to save post')
-      router.push('/my-posts')
+      router.push(backHref)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save post')
     } finally {
       setSaving(false)
     }
+  }
+
+  function showHtml() {
+    try {
+      setHtml(generateHTML(doc, blogExtensions))
+      setView('html')
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not show HTML')
+    }
+  }
+
+  function showVisual() {
+    try {
+      const next = generateJSON(html, blogExtensions)
+      if (!isTipTapDoc(next)) throw new Error('HTML could not be read as a document')
+      setDoc(next)
+      setView('visual')
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'HTML could not be read as a document')
+    }
+  }
+
+  function insertYoutube() {
+    const id = youtubeVideoId(youtubeDraft)
+    if (!id) {
+      setError('Enter a YouTube link')
+      return
+    }
+    setDoc((prev) => ({
+      type: 'doc',
+      content: [...prev.content, { type: 'youtube', attrs: { videoId: id } }],
+    }))
+    setYoutubeDraft('')
+    setError('')
   }
 
   function applyAi(text: string) {
@@ -187,14 +262,13 @@ export function PostEditor({ mode, postId }: EditorProps) {
 
   async function handleDelete() {
     if (!postId) return
-    if (!window.confirm('Delete this post?')) return
     setSaving(true)
     setError('')
     try {
       const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' })
       const data = (await res.json()) as { error?: string }
       if (!res.ok) throw new Error(data.error || 'Failed to delete post')
-      router.push('/my-posts')
+      router.push(backHref)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete post')
@@ -202,14 +276,16 @@ export function PostEditor({ mode, postId }: EditorProps) {
     }
   }
 
+  const deleteLabel = title.trim() || 'this post'
+
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between gap-4">
+    <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">
           {mode === 'edit' ? 'Edit post' : 'New post'}
         </h1>
-        <Link href="/my-posts" className="text-sm text-gray-600 hover:underline">
-          Back to posts
+        <Link href={backHref} className="text-sm text-gray-600 hover:underline">
+          Back
         </Link>
       </div>
       {loading ? <p className="text-sm text-gray-500">Loading post…</p> : null}
@@ -219,7 +295,7 @@ export function PostEditor({ mode, postId }: EditorProps) {
             event.preventDefault()
             void handleSave('draft')
           }}
-          className="space-y-4 max-w-3xl"
+          className="max-w-3xl min-w-0 space-y-4"
         >
           <div>
             <label htmlFor="post-title" className="block text-sm font-medium text-gray-700">
@@ -249,6 +325,45 @@ export function PostEditor({ mode, postId }: EditorProps) {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
+              <label htmlFor="post-seo-title" className="block text-sm font-medium text-gray-700">
+                SEO title
+              </label>
+              <Input
+                id="post-seo-title"
+                value={seoTitle}
+                onChange={(e) => setSeoTitle(e.target.value)}
+                placeholder="Uses the post title when empty"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label htmlFor="post-og-image" className="block text-sm font-medium text-gray-700">
+                Social image URL
+              </label>
+              <Input
+                id="post-og-image"
+                value={ogImageUrl}
+                onChange={(e) => setOgImageUrl(e.target.value)}
+                placeholder="Uses the cover image when empty"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="post-meta" className="block text-sm font-medium text-gray-700">
+              Meta description
+            </label>
+            <Textarea
+              id="post-meta"
+              value={metaDescription}
+              onChange={(e) => setMetaDescription(e.target.value)}
+              rows={2}
+              placeholder="Uses the summary when empty"
+              className="mt-1"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
               <label htmlFor="post-categories" className="block text-sm font-medium text-gray-700">
                 Categories
               </label>
@@ -273,26 +388,59 @@ export function PostEditor({ mode, postId }: EditorProps) {
               />
             </div>
           </div>
-          <div className="h-[640px] overflow-hidden rounded-md border bg-white">
-            <div className="flex h-full">
-              <div className="min-w-0 flex-1">
-                <DocumentEditor
-                  initialDoc={doc}
-                  onDocChange={setDoc}
-                  onOpenAi={() => setAiOpen(true)}
-                  onRequestImageUrl={requestImageUrl}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant={view === 'visual' ? 'default' : 'outline'} onClick={showVisual}>
+              Visual
+            </Button>
+            <Button type="button" variant={view === 'html' ? 'default' : 'outline'} onClick={showHtml}>
+              HTML
+            </Button>
+          </div>
+          {view === 'visual' ? (
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+              <Input
+                value={youtubeDraft}
+                onChange={(e) => setYoutubeDraft(e.target.value)}
+                placeholder="YouTube link"
+                aria-label="YouTube link"
+                className="min-w-0"
+              />
+              <Button type="button" variant="outline" onClick={insertYoutube}>
+                Insert video
+              </Button>
+            </div>
+          ) : null}
+          {view === 'visual' ? (
+            <div className="h-[640px] max-w-full min-w-0 overflow-hidden rounded-md border bg-white">
+              <div className="flex h-full min-w-0">
+                <div className="min-w-0 flex-1">
+                  <DocumentEditor
+                    initialDoc={doc}
+                    extensions={blogExtensions}
+                    onDocChange={setDoc}
+                    onOpenAi={() => setAiOpen(true)}
+                    onRequestImageUrl={requestImageUrl}
+                  />
+                </div>
+                <AiPanel
+                  open={aiOpen}
+                  onClose={() => setAiOpen(false)}
+                  doc={doc}
+                  onApply={applyAi}
+                  presets={BLOG_PRESETS}
+                  purpose="blog"
                 />
               </div>
-              <AiPanel
-                open={aiOpen}
-                onClose={() => setAiOpen(false)}
-                doc={doc}
-                onApply={applyAi}
-                presets={BLOG_PRESETS}
-                purpose="blog"
-              />
             </div>
-          </div>
+          ) : (
+            <Textarea
+              value={html}
+              onChange={(e) => setHtml(e.target.value)}
+              aria-label="HTML"
+              rows={24}
+              className="max-w-full min-h-[640px] min-w-0 font-mono text-sm"
+            />
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="text-sm font-medium text-gray-700">Status</p>
@@ -333,7 +481,7 @@ export function PostEditor({ mode, postId }: EditorProps) {
                 id="post-cover-file"
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
-                className="mt-2 block text-sm"
+                className="mt-2 block max-w-full text-sm"
                 onChange={(event) => {
                   const file = event.target.files?.[0]
                   if (file) void uploadCover(file)
@@ -364,9 +512,33 @@ export function PostEditor({ mode, postId }: EditorProps) {
               </Button>
             ) : null}
             {mode === 'edit' ? (
-              <Button type="button" variant="outline" disabled={saving} onClick={handleDelete}>
-                Delete
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="outline" disabled={saving}>
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete “{deleteLabel}”?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This hides the post from the public blog and from My Posts. It does not remove the row.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={saving}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        void handleDelete()
+                      }}
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             ) : null}
           </div>
         </form>

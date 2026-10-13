@@ -4,19 +4,17 @@ import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AdminSettingsForm } from '@/components/AdminSettingsForm'
 import { ModelSettingsForm } from '@/app/(dashboard)/documents/components/ModelSettingsForm'
-import AdminAgentTemplates from '@/components/agents/AdminAgentTemplates'
 
 const TABS = [
   { id: 'site', label: 'Site Settings' },
   { id: 'ai-docs', label: 'AI Docs' },
-  { id: 'templates', label: 'Agent Templates' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
 
 function initialTab(searchParams: ReturnType<typeof useSearchParams>): TabId {
   const tab = searchParams.get('tab')
-  if (tab === 'ai-docs' || tab === 'templates' || tab === 'site') return tab
+  if (tab === 'ai-docs' || tab === 'site') return tab
   return 'site'
 }
 
@@ -53,7 +51,7 @@ export function AdminSettingsTabs() {
 
       {activeTab === 'site' ? (
         <AdminSettingsForm />
-      ) : activeTab === 'ai-docs' ? (
+      ) : (
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-1">AI Docs</h2>
           <p className="text-sm text-gray-500 mb-6">
@@ -61,11 +59,6 @@ export function AdminSettingsTabs() {
             Used by the document editor AI panel.
           </p>
           <ModelSettingsForm />
-        </div>
-      ) : (
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">Agent Templates</h2>
-          <AdminAgentTemplates />
         </div>
       )}
     </div>

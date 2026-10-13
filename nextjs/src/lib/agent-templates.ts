@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { isUuid } from '@/lib/ids'
+import { skillAttachmentError } from '@/lib/starter-catalog-allowlist'
 import type { AgentTemplate } from '@/lib/types'
 
 export const MAX_TEMPLATE_SKILLS = 8
@@ -15,7 +16,7 @@ export const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 /** Same default as Documents / chats. OpenRouter model slugs, not a hard allowlist. */
 export const DEFAULT_AGENT_MODEL = 'poolside/laguna-s-2.1:free'
 
-export const STARTER_TEMPLATE_SLUG = 'starter-assistant'
+export const STARTER_TEMPLATE_SLUG = 'general'
 
 export type TemplateStatus = 'draft' | 'published'
 
@@ -27,21 +28,21 @@ export type AgentDefaultsV1 = {
 export type CatalogTemplate = AgentTemplate & { builtin?: boolean }
 
 /**
- * The one generic recipe this starter ships. Not SEO/Ads-specific.
- * Shown in the gallery until an admin publishes a matching row.
+ * Code catalog entry for the General agent. Not a database row and not a clone source.
+ * Plain chat (agent_id null) does not use this prompt or its skill_ids.
  */
 export const STARTER_TEMPLATE: Omit<
   AgentTemplate,
   'id' | 'created_by' | 'cloned_from_template_id' | 'created_at' | 'updated_at'
 > & { id: typeof STARTER_TEMPLATE_SLUG } = {
   id: STARTER_TEMPLATE_SLUG,
-  name: 'Starter Assistant',
+  name: 'General',
   slug: STARTER_TEMPLATE_SLUG,
   description:
-    'A general-purpose assistant. Clone it, then attach skills to specialize. Chat injects those skills as system context.',
+    'A general-purpose assistant. Attach your own skills to specialize. Chat injects those skills as system context when you pick General agent. Plain General chat does not.',
   status: 'published',
   system_prompt:
-    'You are a helpful workspace assistant. Follow any attached skills as instructions. Be concise, accurate, and ask a clarifying question when the request is ambiguous.',
+    'You are a helpful workspace assistant. Follow any attached personal skills as instructions. Be concise, accurate, and ask a clarifying question when the request is ambiguous.',
   skill_ids: [],
   required_toolkits: [],
   mcp_config: {},
@@ -241,17 +242,7 @@ export async function assertSkillIdsVisible(
     console.error('assertSkillIdsVisible:', error)
     return 'Failed to validate skills.'
   }
-  const byId = new Map((data || []).map((row) => [String(row.id).toLowerCase(), row]))
-  for (const id of skillIds) {
-    const row = byId.get(id.toLowerCase())
-    if (!row) {
-      return 'One or more skills are missing or not readable.'
-    }
-    if (row.user_id !== null && row.user_id !== userId) {
-      return 'You can only attach your own skills or shared skills.'
-    }
-  }
-  return null
+  return skillAttachmentError(userId, skillIds, data || [])
 }
 
 export async function isAdminUser(

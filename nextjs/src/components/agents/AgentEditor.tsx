@@ -21,6 +21,7 @@ import {
 import { SkillPicker } from '@/components/agents/SkillPicker'
 import { chatPathForAgent } from '@/lib/chat-agent'
 import { DEFAULT_AGENT_MODEL, modelIdFromDefaults } from '@/lib/agent-templates'
+import { builtinKeyFromDefaults } from '@/lib/starter-catalog-allowlist'
 import type { AgentSkillListItem } from '@/app/api/agent-skills/route'
 import type { UserAgent } from '@/lib/types'
 
@@ -127,6 +128,8 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
     )
   }
 
+  const builtinKey = builtinKeyFromDefaults(agent.defaults)
+
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
@@ -140,9 +143,11 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
         </div>
         <h1 className="mt-2 text-2xl font-bold text-gray-900">Edit agent</h1>
         <p className="text-sm text-gray-500">
-          {agent.source_template_name
-            ? `Cloned from ${agent.source_template_name}.`
-            : 'Custom agent.'}{' '}
+          {builtinKey
+            ? 'Built-in agent. Personal skills saved here apply only after you pick this agent in Chat. Plain General chat does not load them. Built-in Task Management skills are always on for Task Management and do not use a skill slot.'
+            : agent.source_template_name
+              ? `From ${agent.source_template_name}. Personal skills saved here are not used by plain General chat.`
+              : 'Custom agent. Personal skills saved here are not used by plain General chat.'}{' '}
           Open Chat and switch to this agent to use its prompt and skills.
         </p>
       </div>
@@ -179,7 +184,14 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
           />
         </label>
         <div className="space-y-2">
-          <span className="text-sm font-medium text-gray-700">Skills</span>
+          <span className="text-sm font-medium text-gray-700">Personal skills</span>
+          <p className="text-xs text-gray-500">
+            Up to 8 of your uploaded skills. The same skill can be saved on both General agent
+            and Task Management. Plain General chat (no agent) does not read either list.
+            {builtinKey === 'task-management'
+              ? ' Task Management also always includes its four built-in task files.'
+              : ''}
+          </p>
           <SkillPicker skills={skills} selected={skillIds} onChange={setSkillIds} />
         </div>
       </div>
@@ -191,9 +203,11 @@ export default function AgentEditor({ agentId }: { agentId: string }) {
         <Button variant="outline" asChild>
           <Link href="/agent-skills">Manage skills</Link>
         </Button>
-        <Button variant="destructive" onClick={() => setConfirmDelete(true)} disabled={saving}>
-          Delete
-        </Button>
+        {builtinKey ? null : (
+          <Button variant="destructive" onClick={() => setConfirmDelete(true)} disabled={saving}>
+            Delete
+          </Button>
+        )}
       </div>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
