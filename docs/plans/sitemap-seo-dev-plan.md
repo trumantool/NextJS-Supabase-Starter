@@ -1,7 +1,7 @@
 # Sitemap + SEO / Structured Data — Development Plan
 
 > **Repo:** `trumantool/NextJS-Supabase-Starter` · **Supabase:** `cyczlgdaocwueaacqxsh` (starter only)
-> **Baseline read:** `main` @ `72e8c3f` (2026-10-08 9:07 PM ET, "Add the starter blog… (#16)"). Rechecked 2026-10-09; `main` is still that commit.
+> **Baseline read:** `main` @ `46ee4ad` (2026-10-13, cleanup #26–#29 plus blog Phase A). The 2026-10-08 read was `72e8c3f`.
 > **Status:** PLAN ONLY. No application code, migrations, or DB changes. Nothing here touches `glplvrljdgowcwuubkau`.
 > **Next.js:** `^15.4.8` in `nextjs/package.json`, lockfile resolves **15.5.7**. API notes below target Next 15.
 
@@ -10,7 +10,7 @@
 **2026-10-08 — rev 2** (SEO review applied)
 
 - **M1.** `/auth` is removed from robots.txt Disallow. Disallow keeps `/api/` and `/documents/api/`. Auth and dashboard pages rely on `noindex`. Disallow and `noindex` can't both work on one URL. Q9's default also drops the dashboard Disallow.
-- **M2.** Previews and custom branch domains: `X-Robots-Tag: noindex` plus allow-all robots.txt, or Vercel Deployment Protection. Production `*.vercel.app` and the www/apex duplicate **308** to `siteUrl()`. `/api/*` is exempt (cron, Stripe webhook, auth callbacks).
+- **M2.** Previews and custom branch domains: `X-Robots-Tag: noindex` plus allow-all robots.txt, or Vercel Deployment Protection. Production `*.vercel.app` and the www/apex duplicate **308** to `siteUrl()`. `/api/*` is exempt (Stripe webhook, auth callbacks). There is no cron route.
 - **M3.** One `getBusinessNap()` for `/contact`, the footer, and LocalBusiness JSON-LD. No address → `Organization`. `BusinessType` is a strict union of real subtypes.
 - **M4.** Edu markup targets the Course list carousel: `ItemList` on `/courses` with at least 3 courses, each with `@id`, `name`, `description`, and `provider`. Course Info is retired.
 - **M5.** `absoluteUrl()` keeps an allow-listed `canonicalParams` (default `['page']`).
@@ -18,6 +18,13 @@
 - **Verdicts.** `image:loc` only. At most 1000 images per URL. Timezone offsets on every datetime. Tag pages: `noindex`, self-canonical, out of the sitemap, not in robots.txt. WebSite + Organization on the home page. One merged `@graph` per page. No headline length cap.
 - **Also in this rev.** Host canonicalization. IndexNow opt-in, default off. Bing Webmaster Tools submission. 308 on slug change via a server-side lookup on the 404 path (redirect table is a later optional step). 404 for empty archives. Trailing-slash assertions. RSS capped at 50 items with `atom:link rel="self"`. `/legal/refund` in `staticRoutes`. A verification step for whether `revalidateTag` purges the Vercel CDN when the route handler sets its own `s-maxage`.
 - **Porting.** marketing-agent blog PR [#115](https://github.com/trumantool/marketing-agent/pull/115) is **merged** on that repo's `main` (2026-10-09; it is not still an open draft). Its `app/sitemap.ts` already adds `/blog` through `listSitemapEntries()` and still stamps today's `lastModified` plus `changeFrequency`/`priority`. That port extends the file. AfterAllCare shares `glplvrljdgowcwuubkau` with edu and marketing-agent: additive app code only, and its sitemap uses a server-only admin read.
+
+**2026-10-13 — reconciled with `main` @ `46ee4ad`**
+
+- Cleanup #26–#29 is on `main`. `/agent-templates`, `/automations`, `/api/cron/automations`, and `/api/workers/automations` are gone. `nextjs/vercel.json` is `{}`. Do not add a cron. Host canonicalization still must not 308 `/api/*` (Stripe webhook and auth callback remain).
+- Blog Phase A is in. The public header label is **Blog** and the path stays `/posts`. Do not rename it to `/blog`. Admin **Blog → My Posts** is `/admin/blog`.
+- Public post reads skip soft-deleted rows (`posts.deleted_at` is null). The sitemap source has to do the same. A missing `deleted_at` column is logged and the read retries without that filter.
+- `admin_settings` is scoped by `(app_key, option_name)`. A blank `ADMIN_SETTINGS_APP_KEY` stays unscoped.
 
 **For agentic workers:** execute phase by phase. Each phase ends with acceptance criteria; do not start the next phase until they pass. Keep the existing `npm test` (node `--test`) suite green and add new pure-function tests to the `test` script in `nextjs/package.json`.
 
@@ -46,13 +53,13 @@ Non-goals: i18n/hreflang (no i18n exists), video sitemaps (optional later for Ed
 |---|---|---|
 | **Public** `(public)/` | `/`, `/posts`, `/posts/[slug]`, `/posts/category/[slug]`, `/posts/tag/[slug]`, `/posts/author/[slug]`, `/posts/rss.xml` (route), `/contact`, `/privacy`, `/terms`, `/legal`, `/legal/[document]` (`privacy`, `terms`, `refund`) | All post pages are `dynamic = 'force-dynamic'`. |
 | **Auth** `auth/` | `/auth/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-email`, `/2fa` | Pages are `'use client'`. `auth/layout.tsx` is a server component (can export `metadata`). |
-| **Dashboard** `(dashboard)/` (no URL segment) | `/dashboard`, `/admin`, `/admin/blog`, `/my-posts/*`, `/documents/*`, `/chat/*`, `/agents/*`, `/agent-skills`, `/agent-templates`, `/automations/*`, `/storage`, `/todos`, `/user-settings` | `(dashboard)/layout.tsx` is a server component. Middleware also protects `/resume-builder` and `/table`. |
-| **API** `api/` + `(dashboard)/documents/api/*` | `/api/*` (posts, stripe, chat, cron, workers, user, admin, auth callback…), `/documents/api/*` | Machine endpoints. Host canonicalization must not 308 these. |
+| **Dashboard** `(dashboard)/` (no URL segment) | `/dashboard`, `/admin`, `/admin/blog`, `/my-posts/*`, `/documents/*`, `/chat/*`, `/agents/*`, `/agent-skills`, `/storage`, `/todos`, `/user-settings` | No `/agent-templates` or `/automations` pages. Middleware also protects `/resume-builder` and `/table`. Public header **Blog** links to `/posts`. |
+| **API** `api/` + `(dashboard)/documents/api/*` | `/api/*` (posts, stripe, chat, tasks, user, admin, auth callback…), `/documents/api/*` | No automations cron or worker routes. Host canonicalization must not 308 these. |
 
 ### 2.2 Existing SEO pieces
 
 - **`nextjs/src/app/sitemap.ts`** — exists. Single flat `MetadataRoute.Sitemap`, `force-dynamic`. Emits `/`, `/posts`, every live blog post (`lastModified: post.updated_at`), **all** category and author archive URLs (even with zero live posts). No tag pages, no `/contact` or legal pages, no images, no chunking, no index. No `changeFrequency`/`priority` (good).
-- **`nextjs/src/app/robots.ts`** — exists. `allow: '/'`, `disallow: ['/my-posts','/admin','/dashboard','/documents','/auth']`, `sitemap: ${origin}/sitemap.xml` when origin is set. **Missing** from disallow vs. middleware's protected list: `/chat`, `/agents`, `/agent-skills`, `/agent-templates`, `/automations`, `/storage`, `/todos`, `/user-settings`, `/resume-builder`, `/table`, and `/api/`. A test in `nextjs/src/lib/posts.test.ts` (L272–275) asserts robots contains `/my-posts` and does **not** contain `'/posts'` or `"/posts"`. Phase 3 rewrites the `/my-posts` assertion to match the new Disallow list and adds an assertion that `/posts/tag` is absent.
+- **`nextjs/src/app/robots.ts`** — exists. `allow: '/'`, `disallow: ['/my-posts','/admin','/dashboard','/documents','/auth']`, `sitemap: ${origin}/sitemap.xml` when origin is set. **Missing** from disallow vs. middleware's protected list: `/chat`, `/agents`, `/agent-skills`, `/storage`, `/todos`, `/user-settings`, `/resume-builder`, `/table`, and `/api/`. `/agent-templates` and `/automations` are not routes anymore. A test in `nextjs/src/lib/posts.test.ts` (L272–275) asserts robots contains `/my-posts` and does **not** contain `'/posts'` or `"/posts"`. Phase 3 rewrites the `/my-posts` assertion to match the new Disallow list and adds an assertion that `/posts/tag` is absent.
 - **`nextjs/src/lib/blog-seo.ts`** — `publicSiteOrigin()` (parses `NEXT_PUBLIC_SITE_ORIGIN`, returns `URL.origin`, so trailing slash/path are already stripped), `postCanonical()`, `xmlEscape()`, `articleJsonLd()` → `[BlogPosting, BreadcrumbList]`. Gaps: no `publisher`, author has no `url`, `image` is a bare string, no `@id` graph, and the page injects it with plain `JSON.stringify` (no `<` escaping → `</script>` injection risk from a post title).
 - **`nextjs/src/app/(public)/posts/[slug]/page.tsx`** — good `generateMetadata` (title, description, `alternates.canonical`, `openGraph` type article + `publishedTime`, `twitter`). Missing `modifiedTime`, `authors`, `siteName`.
 - **`nextjs/src/app/(public)/posts/[slug]/opengraph-image.tsx`** — generated 1200×630 OG card. In Next, file-based `opengraph-image` **overrides** `openGraph.images` from `generateMetadata`, so the post's `cover_image_url` is never the OG image today (Twitter still uses the cover because there is no `twitter-image` file). **Settled in §9 Q3:** cover first, generated card as fallback, with a matching `twitter-image`.
@@ -75,9 +82,9 @@ Non-goals: i18n/hreflang (no i18n exists), video sitemaps (optional later for Ed
 
 `nextjs/src/middleware.ts` → `lib/supabase/middleware.ts::updateSession()` runs `supabase.auth.getUser()` on **every** non-static request (matcher excludes only `_next/static|_next/image|favicon.ico|images`). So every crawler hit to `/sitemap.xml`, `/robots.txt`, and `/posts/rss.xml` costs a Supabase Auth call. Protected list redirects anonymous users to `/auth/login`. Do not insert logic between `createServerClient` and `getUser()`.
 
-`protectedPaths` today: `/dashboard`, `/documents`, `/resume-builder`, `/storage`, `/todos`, `/table`, `/user-settings`, `/admin`, `/chat`, `/agents`, `/agent-skills`, `/agent-templates`, `/automations`, `/my-posts`.
+`protectedPaths` today: `/dashboard`, `/documents`, `/resume-builder`, `/storage`, `/todos`, `/table`, `/user-settings`, `/admin`, `/chat`, `/agents`, `/agent-skills`, `/my-posts`. `/automations` is not protected because the page is gone. Phase B may add an admin-only blog automation screen later; do not link `/automations` until then.
 
-Host-specific machine routes that a 308 would break: `/api/cron/automations`, `/api/workers/automations`, `/api/stripe/webhook`, `/api/auth/callback`.
+Host-specific machine routes that a 308 would break: `/api/stripe/webhook`, `/api/auth/callback`. The automations cron and worker routes are removed.
 
 ### 2.5 Posts schema (on `main` — prerequisites already satisfied)
 
@@ -86,12 +93,13 @@ Host-specific machine routes that a 308 would break: `/api/cron/automations`, `/
 - **`updated_at` and `website` both exist.** No schema prerequisite for this plan. The trigger bumps `updated_at` on every UPDATE, including `sort_order`, `origin`, and no-op admin saves. That is why lastmod cannot trust `updated_at` alone (§3.4).
 - **RLS:** `posts_select_published_blog` lets `anon, authenticated` read only `type='blog' AND status='published' AND published_at <= now()`. Courses/lessons are **not** anon-readable in the starter DB. On the shared project, AfterAllCare blog rows are read with the service role (§2.7).
 - Taxonomy (`20261009140200_blog_taxonomy_and_authors.sql`): `blog_categories`, `blog_tags`, `blog_author_profiles` (all with `website`), joins `post_categories`, `post_tags`. `blog_media` table is not anon-readable (bucket `blog-media` is public).
-- App-side filter: `lib/posts.ts::requirePostWebsite(process.env.POSTS_WEBSITE)`; `lib/posts-store.ts::listPublishedPosts()` filters `website`, `type='blog'`, `status='published'`, `published_at <= now()`. All public reads use `createSSRClient()` (reads `cookies()` → forces dynamic rendering, blocks caching). `listPublishedPosts()` is unbounded.
+- App-side filter: `lib/posts.ts::requirePostWebsite(process.env.POSTS_WEBSITE)`; `lib/posts-store.ts::listPublishedPosts()` filters `website`, `type='blog'`, `status='published'`, `published_at <= now()`, and `deleted_at` is null. All public reads use `createSSRClient()` (reads `cookies()` → forces dynamic rendering, blocks caching). `listPublishedPosts()` is unbounded. Soft-deleted rows stay out of the sitemap.
 - Revalidation today: `posts-store.ts::refreshPublicBlog()` and `(dashboard)/admin/blog/actions.ts` call `revalidatePath('/posts' | '/posts/rss.xml' | '/sitemap.xml' | '/posts/<slug>')`. No `revalidateTag`.
 
 ### 2.6 Open PRs that matter (starter)
 
-- **#13** (open, docs) `docs/plans/posts-stripe-token-ledger.md` — its implementation already merged via #14/#15/#16, so it is effectively superseded. This plan does **not** depend on it.
+- **#13** (open, docs) `docs/plans/posts-stripe-token-ledger.md` — implementation is on `main` via #14 and the blog follow-ups. The plan text now says not to rebuild it. This plan does **not** depend on it.
+- **#25** (open, docs) cleanup plan — executed on `main` by #26–#29. Do not follow it as pending work.
 - **#12** (open) login redirect URL — adds `NEXT_PUBLIC_APP_URL` usage and `admin_settings.login_redirect_url`. Don't conflate with the canonical origin.
 - **#17** (open) anon RLS / SECURITY DEFINER — splits `post_categories_select`/`post_tags_select` into `_public/_admin/_author`. Public policies still allow anon reads of live blog joins, so the archive sitemap source keeps working after #17.
 - #11 (registration provenance) — not relevant.
@@ -219,7 +227,7 @@ Every canonical, OG URL, sitemap `<loc>`, robots `Sitemap:` line, RSS link, and 
 | Request | Response |
 |---|---|
 | `VERCEL_ENV === 'production'` and `Host` ≠ `canonicalHost()`, and the path is not under `/api/` | **308** to the same path and allow-listed query on `siteUrl()`. Covers the production `*.vercel.app` alias and the www/apex duplicate. |
-| Path is `/api/*` or `/documents/api/*` | **No host redirect.** Cron (`/api/cron/automations`, `/api/workers/automations`), Stripe (`/api/stripe/webhook`), and auth (`/api/auth/callback`) must keep the host they were called on. |
+| Path is `/api/*` or `/documents/api/*` | **No host redirect.** Stripe (`/api/stripe/webhook`) and auth (`/api/auth/callback`) must keep the host they were called on. Automations cron routes are gone; do not add one. |
 | `siteUrl()` is null | No redirect. |
 | Preview, or a custom domain on a non-production branch (`staging.example.com`) | No redirect. `X-Robots-Tag: noindex, nofollow` on the response, and robots.txt allows all (§3.6). Vercel already noindexes Preview deployments and outdated Production deployments. It does **not** noindex a custom domain assigned to a non-production branch, so this header is required there. |
 
@@ -362,7 +370,7 @@ export const site = {
   // Q2 still open for /privacy vs /legal/privacy. /legal/refund is settled and listed.
   staticRoutes: ['/', '/posts', '/contact', '/privacy', '/terms', '/legal/refund'],
   noindexPaths: ['/auth', '/dashboard', '/admin', '/my-posts', '/documents', '/chat', '/agents',
-    '/agent-skills', '/agent-templates', '/automations', '/storage', '/todos', '/user-settings',
+    '/agent-skills', '/storage', '/todos', '/user-settings',
     '/resume-builder', '/table'],
   robotsDisallow: ['/api', '/documents/api'],   // trailing-slash + $ forms emitted in robots.ts
   indexTagArchives: false,
@@ -503,7 +511,7 @@ curl -sS $BASE/posts/<draft-slug> -o /dev/null -w '%{http_code}\n'             #
 curl -sSI $BASE/posts/ -o /dev/null -w '%{http_code} %{redirect_url}\n'        # 308 to /posts
 curl -sS $BASE/auth/login | grep -o '<meta name="robots"[^>]*>'                 # noindex, and robots.txt does not Disallow it
 curl -sSI "https://<project>.vercel.app/" -o /dev/null -w '%{http_code} %{redirect_url}\n'  # 308 to $BASE/
-curl -sSI "https://<project>.vercel.app/api/cron/automations" | head -n 1      # not a 308 to $BASE
+curl -sSI "https://<project>.vercel.app/api/stripe/webhook" | head -n 1       # not a 308 to $BASE
 curl -sSI $BASE/posts/category/<empty-slug> -o /dev/null -w '%{http_code}\n'   # 404
 curl -sS $BASE/posts/rss.xml | head -c 400                                     # atom:link rel="self"; ≤50 items
 ```
