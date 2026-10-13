@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types'
+import { adminSettingsAppKey, filterByAdminSettingsAppKey } from '@/lib/admin-settings-scope'
 
 /** admin_settings.option_name for the post-login / auth-callback base URL. */
 export const LOGIN_REDIRECT_OPTION = 'login_redirect_url'
@@ -63,11 +64,14 @@ export function passwordRecoveryUrl(base: string): string {
 export async function readLoginRedirectUrl(
   supabase: SupabaseClient<Database>,
 ): Promise<string | null> {
-  const { data, error } = await supabase
-    .from('admin_settings')
-    .select('option_value')
-    .eq('option_name', LOGIN_REDIRECT_OPTION)
-    .maybeSingle()
+  const scoped = filterByAdminSettingsAppKey(
+    supabase
+      .from('admin_settings')
+      .select('option_value')
+      .eq('option_name', LOGIN_REDIRECT_OPTION),
+    adminSettingsAppKey(process.env.ADMIN_SETTINGS_APP_KEY),
+  )
+  const { data, error } = await scoped.maybeSingle()
 
   if (error) {
     console.error('Failed to read login_redirect_url:', error.message)

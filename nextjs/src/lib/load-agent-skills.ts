@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { AGENT_SKILLS_BUCKET, stripSkillFrontmatter } from '@/lib/agent-skills'
 import { isUuid } from '@/lib/ids'
+import { isSkillRowVisible, skillAttachmentError } from '@/lib/starter-catalog-allowlist'
 
 export const MAX_CHAT_SKILLS = 8
 export const MAX_SKILL_BODY_BYTES = 64 * 1024
@@ -15,13 +16,6 @@ export type SkillPromptPart = {
 export type LoadedAgentSkills = {
   promptSection: string
   notes: string[]
-}
-
-export function isSkillVisibleToOwner(
-  ownerUserId: string,
-  skillUserId: string | null
-): boolean {
-  return skillUserId === null || skillUserId === ownerUserId
 }
 
 export function utf8ByteLength(text: string): number {
@@ -98,14 +92,7 @@ export async function assertSkillIdsVisible(
     return 'Failed to validate skills.'
   }
 
-  const byId = new Map((data || []).map((row) => [String(row.id).toLowerCase(), row]))
-  for (const id of skillIds) {
-    const row = byId.get(id.toLowerCase())
-    if (!row || !isSkillVisibleToOwner(userId, row.user_id)) {
-      return 'One or more skills are not available. Choose skills from your library or the shared library.'
-    }
-  }
-  return null
+  return skillAttachmentError(userId, skillIds, data || [])
 }
 
 /**
@@ -138,8 +125,8 @@ export async function loadAgentSkills(opts: {
       .eq('id', id)
       .maybeSingle()
 
-    if (error || !row || !isSkillVisibleToOwner(opts.ownerUserId, row.user_id)) {
-      notes.push(`Skipped skill ${id}: deleted or not readable.`)
+    if (error || !row || !isSkillRowVisible(row, opts.ownerUserId)) {
+      notes.push(`Skipped skill ${id}: deleted, shared catalog, or not readable.`)
       continue
     }
 

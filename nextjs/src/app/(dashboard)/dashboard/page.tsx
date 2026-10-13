@@ -11,9 +11,8 @@ import {
     User,
     Bot,
     BookOpen,
-    LayoutTemplate,
     MessageSquare,
-    CalendarClock,
+    ListChecks,
     Settings,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -145,33 +144,20 @@ export default function DashboardContent() {
                             </div>
                             <div>
                                 <h3 className="font-medium">Skills</h3>
-                                <p className="text-sm text-gray-500">Shared and personal skill files</p>
+                                <p className="text-sm text-gray-500">Personal skill files and built-in task skills</p>
                             </div>
                         </Link>
 
                         <Link
-                            href="/agent-templates"
+                            href="/chat?builtin=task-management"
                             className="flex items-center gap-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                         >
                             <div className="p-2 bg-primary-50 rounded-full">
-                                <LayoutTemplate className="h-4 w-4 text-primary-600" />
+                                <ListChecks className="h-4 w-4 text-primary-600" />
                             </div>
                             <div>
-                                <h3 className="font-medium">Templates</h3>
-                                <p className="text-sm text-gray-500">Clone a starter recipe</p>
-                            </div>
-                        </Link>
-
-                        <Link
-                            href="/automations"
-                            className="flex items-center gap-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-primary-50 rounded-full">
-                                <CalendarClock className="h-4 w-4 text-primary-600" />
-                            </div>
-                            <div>
-                                <h3 className="font-medium">Automations</h3>
-                                <p className="text-sm text-gray-500">Schedule OpenRouter jobs and review run history</p>
+                                <h3 className="font-medium">Task Management</h3>
+                                <p className="text-sm text-gray-500">Open a chat that can list and update your to-dos</p>
                             </div>
                         </Link>
 
@@ -198,7 +184,7 @@ export default function DashboardContent() {
                                 </div>
                                 <div>
                                     <h3 className="font-medium">Admin</h3>
-                                    <p className="text-sm text-gray-500">Site settings, AI Docs model, agent templates</p>
+                                    <p className="text-sm text-gray-500">Site settings and the AI Docs model</p>
                                 </div>
                             </Link>
                         ) : null}

@@ -11,8 +11,6 @@ GRANT EXECUTE ON FUNCTION authenticative.is_user_authenticated() TO service_role
 
 REVOKE ALL ON FUNCTION authenticative.is_admin() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION authenticative.is_admin() FROM PUBLIC, anon, authenticated;
--- Public post_categories and post_tags policies are TO anon and call this.
-GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO anon;
 GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION authenticative.is_admin() TO service_role;
 

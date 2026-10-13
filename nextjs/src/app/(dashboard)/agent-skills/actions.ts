@@ -2,6 +2,10 @@
 
 import { revalidatePath } from 'next/cache'
 import { createSSRClient } from '@/lib/supabase/server'
+import { prepareSkillPreviewBody } from '@/lib/agent-skills'
+import { readBuiltinSkillMarkdown } from '@/lib/builtin-skill-files'
+import { builtinSkillBySlug } from '@/lib/builtin-agents'
+import { isSkillRowVisible } from '@/lib/starter-catalog-allowlist'
 import {
   ALLOWED_SKILL_EXT,
   MAX_SKILL_BYTES,
@@ -349,4 +353,43 @@ async function deleteSkill(id: string, shared: boolean): Promise<ActionResult> {
 
   revalidatePath('/agent-skills')
   return ok('Skill deleted.')
+}
+
+/** Preview a personal skill. Shared catalog objects are refused before any signed URL. */
+export async function previewAgentSkill(id: string): Promise<ActionResult<{ text: string }>> {
+  const auth = await requireUser()
+  if ('error' in auth) return auth.error
+  const { supabase, userId } = auth
+
+  const { data: row, error } = await supabase
+    .from('agent_skills')
+    .select('id, user_id, skill_url, skill_name')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) return fail(error.message)
+  if (!row || !isSkillRowVisible(row, userId)) {
+    return fail('That skill is not available to preview.')
+  }
+
+  const { data: blob, error: downloadError } = await supabase.storage
+    .from('agent-skills')
+    .download(row.skill_url)
+  if (downloadError || !blob) {
+    return fail('Could not read that skill file.')
+  }
+  const raw = await blob.text()
+  return ok('Preview ready.', { text: prepareSkillPreviewBody(raw) })
+}
+
+/** Read a built-in Task Management skill from the repo. These files are not storage objects. */
+export async function previewBuiltinSkill(
+  slug: string
+): Promise<ActionResult<{ text: string; name: string }>> {
+  const auth = await requireUser()
+  if ('error' in auth) return auth.error
+  const skill = builtinSkillBySlug(slug)
+  const markdown = readBuiltinSkillMarkdown(slug)
+  if (!skill || !markdown) return fail('Built-in skill not found.')
+  return ok('Preview ready.', { text: prepareSkillPreviewBody(markdown), name: skill.name })
 }

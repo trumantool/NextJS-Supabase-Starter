@@ -3,6 +3,7 @@ import {FileObject} from "@supabase/storage-js";
 import {Database} from "@/lib/types";
 import {AGENT_SKILLS_BUCKET} from "@/lib/agent-skills";
 import {authCallbackUrl, getAuthRedirectBase} from "@/lib/auth-redirect";
+import {isSkillRowVisible} from "@/lib/starter-catalog-allowlist";
 
 /**
  * My Files bucket. Objects live at `{userId}/{sanitizedFileName}`.
@@ -137,10 +138,16 @@ export class SassClient {
     }
 
     async listAgentSkills() {
-        return this.client
+        const { data: auth } = await this.client.auth.getUser()
+        const result = await this.client
             .from('agent_skills')
             .select('*')
             .order('skill_name', { ascending: true });
+        if (result.error || !result.data || !auth.user) return result
+        return {
+            ...result,
+            data: result.data.filter((row) => isSkillRowVisible(row, auth.user!.id)),
+        }
     }
 
     async signAgentSkillUrl(skillUrl: string, timeInSec: number, forDownload: boolean = false) {

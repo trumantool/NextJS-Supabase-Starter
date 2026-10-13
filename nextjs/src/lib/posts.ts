@@ -23,6 +23,8 @@ export function isPostWebsite(value: string): value is PostWebsite {
 /**
  * The deploying app passes its site via POSTS_WEBSITE. Empty and unknown
  * values are rejected. Nothing falls back to edu or marketing-agent.
+ * Writes use this. Public reads use publicPostWebsite so a missing value
+ * renders an empty list instead of throwing.
  */
 export function requirePostWebsite(value: string | undefined): PostWebsite {
   const website = value?.trim() ?? ''
@@ -30,6 +32,65 @@ export function requirePostWebsite(value: string | undefined): PostWebsite {
     throw new Error(POSTS_WEBSITE_ERROR)
   }
   return website
+}
+
+/**
+ * Public pages, RSS, and the sitemap. Unset and invalid values log a warning
+ * and return null so callers render an empty list or feed.
+ */
+export function publicPostWebsite(
+  value: string | undefined,
+  warn: (message: string) => void = console.warn
+): PostWebsite | null {
+  const website = value?.trim() ?? ''
+  if (isPostWebsite(website)) return website
+  warn(POSTS_WEBSITE_ERROR)
+  return null
+}
+
+/** PostgREST / Postgres codes for a table or column the shared database may not have. */
+export const MISSING_BLOG_SCHEMA_CODES = ['42P01', '42703', 'PGRST200', 'PGRST204', 'PGRST205'] as const
+
+export function isMissingBlogSchemaError(
+  error: { code?: string | null; message?: string | null } | null | undefined
+): boolean {
+  if (!error?.code) return false
+  return (MISSING_BLOG_SCHEMA_CODES as readonly string[]).includes(error.code)
+}
+
+export function isMissingBodyDocError(
+  error: { code?: string | null; message?: string | null } | null | undefined
+): boolean {
+  if (!isMissingBlogSchemaError(error)) return false
+  return /body_doc/i.test(error?.message ?? '')
+}
+
+export function isMissingDeletedAtError(
+  error: { code?: string | null; message?: string | null } | null | undefined
+): boolean {
+  if (!isMissingBlogSchemaError(error)) return false
+  return /deleted_at/i.test(error?.message ?? '')
+}
+
+/** Shown when posts.deleted_at is absent. Never follow this with a hard delete. */
+export const SOFT_DELETE_UNAVAILABLE =
+  'Soft delete is unavailable because posts.deleted_at is missing. The post was not deleted.'
+
+export function logBlogSchemaGap(
+  label: string,
+  error: { code?: string | null; message?: string | null }
+): void {
+  console.warn(`Blog schema unavailable (${label}): ${error.code ?? 'unknown'} ${error.message ?? ''}`.trim())
+}
+
+/** Public blog surfaces stay up when a read throws. */
+export async function settlePublicBlog<T>(label: string, load: () => Promise<T>, empty: T): Promise<T> {
+  try {
+    return await load()
+  } catch (error) {
+    console.warn(`posts ${label}:`, error instanceof Error ? error.message : error)
+    return empty
+  }
 }
 
 export function slugifyTitle(title: string): string {
@@ -187,6 +248,7 @@ export function normalizeNewsletterEmail(value: unknown): string {
 }
 
 export function httpStatusForPostError(message: string): number {
+  if (message === POSTS_WEBSITE_ERROR) return 503
   if (message === 'Unauthorized') return 401
   if (message === SLUG_TAKEN_MESSAGE) return 409
   if (message === 'Post not found' || message === 'Parent post was not found') return 404
