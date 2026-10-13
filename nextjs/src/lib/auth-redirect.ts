@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types'
-import { adminSettingsAppKey, filterByAdminSettingsAppKey } from './admin-settings-scope.ts'
 
 /** admin_settings.option_name for the post-login / auth-callback base URL. */
 export const LOGIN_REDIRECT_OPTION = 'login_redirect_url'
@@ -64,6 +63,11 @@ export function passwordRecoveryUrl(base: string): string {
 export async function readLoginRedirectUrl(
   supabase: SupabaseClient<Database>,
 ): Promise<string | null> {
+  // Dynamic import keeps the node test runner from resolving the @/ alias
+  // when it loads the pure helpers in this file.
+  const { adminSettingsAppKey, filterByAdminSettingsAppKey } = await import(
+    '@/lib/admin-settings-scope'
+  )
   const scoped = filterByAdminSettingsAppKey(
     supabase
       .from('admin_settings')
