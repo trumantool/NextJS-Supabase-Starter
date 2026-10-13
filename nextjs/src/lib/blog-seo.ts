@@ -30,7 +30,30 @@ export function xmlEscape(value: string): string {
 type ArticleFields = Pick<
   PublishedPost,
   'title' | 'summary' | 'slug' | 'published_at' | 'updated_at' | 'cover_image_url'
->
+> & {
+  seo_title?: string | null
+  meta_description?: string | null
+  og_image_url?: string | null
+}
+
+function presentText(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? ''
+  return trimmed || null
+}
+
+export function postHeadline(post: Pick<ArticleFields, 'title' | 'seo_title'>): string {
+  return presentText(post.seo_title) ?? post.title
+}
+
+export function postDescription(post: Pick<ArticleFields, 'summary' | 'meta_description'>): string | null {
+  return presentText(post.meta_description) ?? presentText(post.summary)
+}
+
+export function postSocialImage(
+  post: Pick<ArticleFields, 'cover_image_url' | 'og_image_url'>
+): string | null {
+  return presentText(post.og_image_url) ?? presentText(post.cover_image_url)
+}
 
 export function articleJsonLd(input: {
   post: ArticleFields
@@ -41,13 +64,15 @@ export function articleJsonLd(input: {
   const posting: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
-    headline: input.post.title,
+    headline: postHeadline(input.post),
     datePublished: input.post.published_at,
     dateModified: input.post.updated_at,
     author: { '@type': 'Person', name: input.authorName ?? 'Author' },
   }
-  if (input.post.summary) posting.description = input.post.summary
-  if (input.post.cover_image_url) posting.image = input.post.cover_image_url
+  const description = postDescription(input.post)
+  const image = postSocialImage(input.post)
+  if (description) posting.description = description
+  if (image) posting.image = image
   if (canonical) posting.mainEntityOfPage = canonical
 
   const home = input.origin ? `${input.origin}/` : '/'
@@ -61,7 +86,7 @@ export function articleJsonLd(input: {
       {
         '@type': 'ListItem',
         position: 3,
-        name: input.post.title,
+        name: postHeadline(input.post),
         ...(canonical ? { item: canonical } : {}),
       },
     ],

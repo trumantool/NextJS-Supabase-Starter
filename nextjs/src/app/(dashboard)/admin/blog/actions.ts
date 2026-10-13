@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { isCurrentUserAdmin } from '@/app/(dashboard)/admin/actions'
-import { blogSlugsToRefresh, requirePostWebsite } from '@/lib/posts'
+import { blogSlugsToRefresh, requirePostWebsite, SOFT_DELETE_UNAVAILABLE } from '@/lib/posts'
+import { deletePost } from '@/lib/posts-store'
 import { createSSRClient } from '@/lib/supabase/server'
 
 async function requireAdmin() {
@@ -53,30 +54,18 @@ export async function unpublishBlogPost(formData: FormData) {
   )
 }
 
-export async function deleteBlogPost(formData: FormData) {
+export async function deleteBlogPost(id: string): Promise<{ ok: boolean; message: string }> {
   await requireAdmin()
-  const id = String(formData.get('id') ?? '')
-  const website = requirePostWebsite(process.env.POSTS_WEBSITE)
-  const supabase = await createSSRClient()
-  const { data, error } = await supabase
-    .from('posts')
-    .select('id, slug, status, published_at')
-    .eq('id', id)
-    .eq('website', website)
-    .eq('type', 'blog')
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  if (!data) throw new Error('Post not found')
-
-  const { error: deleteError } = await supabase
-    .from('posts')
-    .delete()
-    .eq('id', id)
-    .eq('website', website)
-    .eq('type', 'blog')
-  if (deleteError) throw new Error(deleteError.message)
-
-  refreshBlog(blogSlugsToRefresh(data, null))
+  try {
+    await deletePost(id)
+    return { ok: true, message: 'Deleted' }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete post'
+    if (message === SOFT_DELETE_UNAVAILABLE) {
+      return { ok: false, message }
+    }
+    return { ok: false, message }
+  }
 }
 
 export async function setBlogCommentStatus(formData: FormData) {

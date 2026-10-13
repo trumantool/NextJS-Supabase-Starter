@@ -1,6 +1,6 @@
 # Next.js + Supabase Starter
 
-Reusable Next.js 15 + Supabase SaaS starter. The default product is the slim keep set: auth/MFA, files, todos, documents, chat, agents/skills/templates, automations, and the user/admin settings those need.
+Reusable Next.js 15 + Supabase SaaS starter. The default product is the slim keep set: auth/MFA, files, todos, documents, chat, General and Task Management agents, personal skills, and the user/admin settings those need.
 
 Phases 0–6 of [`docs/plans/slim-starter-feature-extract.md`](./docs/plans/slim-starter-feature-extract.md) are on `main`. This README is the fork path.
 
@@ -30,15 +30,14 @@ The web app lives in `nextjs/`. Dashboard / nav surfaces:
 | Files | `/storage` | `user-files` bucket, objects at `{userId}/{filename}` |
 | To Do | `/todos` | Table `todo_list` (`/table` redirects) |
 | Documents | `/documents` | TipTap + AI panel + .docx export (`/resume-builder` redirects) |
-| Chat | `/chat` | OpenRouter threads, agent switcher, skill context, attachments on `files` |
-| Agents | `/agents` | `user_agents` — `skill_ids`, `defaults.model_id`, clone from a template |
-| Skills | `/agent-skills` | Shared vs mine; bucket `agent-skills` |
-| Templates | `/agent-templates` | Published gallery; admin CRUD under Admin → Agent Templates |
-| Automations | `/automations` | Schedule + Run now + run history. OpenRouter + skills only (no Composio) |
+| Chat | `/chat` | OpenRouter threads. Switcher: General (no agent row), General agent, Task Management |
+| Agents | `/agents` | Blank `user_agents` plus the two built-in rows. Marketing templates stay hidden |
+| Skills | `/agent-skills` | Personal uploads and the four Task Management markdown files |
+| Task Management | `/chat?builtin=task-management` | Ensures one `user_agents` row, then lists and updates that user's `todo_list` |
 | User settings | `/user-settings` | Profile, password, MFA, OpenRouter BYOK |
-| Admin | `/admin` | Site title/url/support, AI Docs model, agent templates |
+| Admin | `/admin` | Site title/url/support and the AI Docs model |
 
-The starter ships **one** generic Starter Assistant recipe (no SEO/Ads seeds).
+Marketing template clones and the generic automations scheduler are not in the UI. The scheduler libraries stay in the repo for a later blog-automation phase. There is no `/agent-templates` page and no `/automations` page.
 
 **Out of the default IA:** marketing/ReachThem campaigns, Composio Ads/SEO admin, intake/assessments, and the old contact-product inbox. `/contact` is a static support page only.
 
@@ -81,7 +80,7 @@ Use this on every fork. Never attach Marketing Agent’s project.
 
 - **No `service_role` on the client.** The app reads it as `PRIVATE_SUPABASE_SERVICE_KEY` in server code only (`serverAdminClient`). Never prefix it with `NEXT_PUBLIC_`. Never ship it in browser bundles.
 - **RLS is owner-scoped.** Tables and storage policies use `auth.uid()` / `authenticative.is_user_authenticated()`. Do not weaken policies to “get the demo working.”
-- **`CRON_SECRET` on worker/cron only.** `/api/cron/automations` and `/api/workers/automations` return 401 if the bearer token is missing or wrong. Cron **wakes** a queue; it does not run the model. See [Automations cron](#automations-cron-wake--execute).
+- **`CRON_SECRET` stays server-only.** The generic daily automations routes are gone. The secret is unused until a later auto-blog cron. Do not add an hourly schedule on the Hobby plan.
 
 ## Local setup
 
@@ -116,7 +115,8 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | No | Marks Checkout as configured. Hosted Checkout does not load Stripe.js |
 | `NEXT_PUBLIC_PRODUCTNAME` | Yes | Title, header, footer, homepage |
 | `POSTS_WEBSITE` | Yes for posts | Site written to and filtered on `public.posts.website`. Allowed: `edu`, `marketing-agent`, `afterallcare`. No default |
-| `CRON_SECRET` | Yes for cron | Bearer secret for `/api/cron/automations` and `/api/workers/automations` |
+| `ADMIN_SETTINGS_APP_KEY` | No | Which `admin_settings` rows this deployment reads and writes. Unset or blank does not mention `app_key`, so a table without that column still works. Set a unique value only after the app_key migration exists. Server-only |
+| `CRON_SECRET` | No until auto-blog | Server-only bearer secret. Unused while `vercel.json` has no cron entries |
 | `NEXT_PUBLIC_THEME` | No | Body theme class (default `theme-sass3`) |
 | `NEXT_PUBLIC_GOOGLE_TAG` | No | Google Analytics |
 | `NEXT_PUBLIC_SSO_PROVIDERS` | No | Comma list: `github`, `google`, `facebook`, `apple` |
@@ -124,45 +124,41 @@ Canonical list: [`nextjs/.env.template`](./nextjs/.env.template). Grep-verified 
 
 `NODE_ENV` is set by Next.js. Do not set `OPENROUTER_API_KEY_REACHTHEMAI`. Do not add Composio or Treg keys.
 
+### Admin settings on a shared database
+
+`public.admin_settings` can hold more than one app once `app_key` exists. Leave `ADMIN_SETTINGS_APP_KEY` unset on a database that has no `app_key` column, including the shared production database: this deployment then does not filter, select, or write `app_key`, and saves conflict on `option_name`. On a database that has the column, unset still does not add an `app_key` filter, so set the variable before sharing that database with another app. Site title, contact info, privacy, terms, and the other non-secret settings stay on the public pages. `secret` and `password` values are not selectable with the anon or authenticated key. The admin UI receives a blank field plus a flag that says whether a value is saved. An empty save keeps the stored value. **Clear saved value** stores an empty string. OpenRouter key resolution reads the row on the server with the service role.
+
+A clone that shares the database with other apps sets `ADMIN_SETTINGS_APP_KEY` to a unique slug, applies the latest migration (or pastes `supabase/schema.sql` on a new project), and copies its own rows. Until those rows exist, this deployment sees no admin settings and public pages use their code defaults.
+
+```sql
+INSERT INTO public.admin_settings (
+  app_key, option_name, option_value, option_field_type, option_title, option_description
+)
+SELECT
+  'your-app-key',
+  option_name,
+  CASE WHEN option_field_type IN ('secret', 'password') THEN '' ELSE option_value END,
+  option_field_type,
+  option_title,
+  option_description
+FROM public.admin_settings
+WHERE app_key IS NULL
+ON CONFLICT (app_key, option_name) DO NOTHING;
+```
+
+Use the same slug in `ADMIN_SETTINGS_APP_KEY`. Do not prefix it with `NEXT_PUBLIC_`. The variable is listed in [`nextjs/.env.template`](./nextjs/.env.template) and [`nextjs/.env.example`](./nextjs/.env.example).
+
 ## Deploy (later — not provisioned by this repo)
 
 This repo does **not** create a Vercel or Supabase project for you.
 
-When you deploy, create a **new** Vercel project pointed at this fork. Set the Next.js **Root Directory** to `nextjs` so [`nextjs/vercel.json`](./nextjs/vercel.json) cron entries apply. Set the same keys from `nextjs/.env.local` as Vercel environment variables, including `CRON_SECRET` and `PRIVATE_SUPABASE_SERVICE_KEY`. Update Supabase Auth site URL and redirect URLs to the production origin.
+When you deploy, create a **new** Vercel project pointed at this fork. Set the Next.js **Root Directory** to `nextjs`. [`nextjs/vercel.json`](./nextjs/vercel.json) has no cron entries. Set the same keys from `nextjs/.env.local` as Vercel environment variables, including `PRIVATE_SUPABASE_SERVICE_KEY`. Keep `CRON_SECRET` if it is already set; nothing calls it until auto-blog. Update Supabase Auth site URL and redirect URLs to the production origin.
 
 Do not attach Marketing Agent’s Vercel project or database.
 
-## Automations cron (wake ≠ execute)
+## Crons
 
-Vercel Cron hits both paths every **5 minutes** (`*/5 * * * *`):
-
-| Path | Role |
-|---|---|
-| `GET /api/cron/automations` | Enqueue due `active` automations onto `automation_runs` (`trigger=schedule`). Does **not** call OpenRouter. |
-| `GET /api/workers/automations` | Fail stale `running` rows, claim up to 5 `queued` rows, execute OpenRouter + skills, write `output`. |
-
-A cron wake only enqueues or claims. A run executes later on the worker tick. `Run now` in the UI also only **enqueues** (`trigger=manual`); it does not skip the worker.
-
-Both endpoints require `Authorization: Bearer $CRON_SECRET` and use the service-role client server-side. Hobby Vercel plans may only allow one cron per day — Pro (or a manual curl) is needed for the 5-minute cadence.
-
-### Manual test (enqueue + execute)
-
-1. Sign in, create an automation at `/automations/new`, then click **Run now** (or `POST /api/automations/<id>/run` while signed in).
-2. Wake the worker with the same secret Vercel Cron would send:
-
-```bash
-curl -sS -H "Authorization: Bearer $CRON_SECRET" \
-  http://localhost:3000/api/workers/automations
-```
-
-3. Open `/automations/<id>` and expand the newest run to read the transcript.
-
-To enqueue due scheduled jobs without waiting for Vercel:
-
-```bash
-curl -sS -H "Authorization: Bearer $CRON_SECRET" \
-  http://localhost:3000/api/cron/automations
-```
+[`nextjs/vercel.json`](./nextjs/vercel.json) has no cron entries. The generic automations pages, API routes, and the two daily schedules are removed. `nextjs/src/lib/automations.ts`, `automation-schedule.ts`, `automation-worker.ts`, and `cron-auth.ts` stay so a later blog-automation phase can use them. `CRON_SECRET` stays in the env template and is unused until that phase. Do not add `0 * * * *` on the Hobby plan.
 
 ## Expo (unsupported in the slim web starter)
 
