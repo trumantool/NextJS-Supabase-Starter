@@ -1,18 +1,94 @@
 import { createSSRClient } from '@/lib/supabase/server'
 import type { PostWebsite } from '@/lib/posts'
-import { isPostSlug, requirePostWebsite, slugifyTitle } from '@/lib/posts'
+import {
+  isMissingBlogSchemaError,
+  isPostSlug,
+  logBlogSchemaGap,
+  publicPostWebsite,
+  slugifyTitle,
+} from '@/lib/posts'
+import type { RollAuthor } from '@/lib/blog-roll'
 import {
   getPublishedPostBySlug,
   listPublishedPosts,
+  listPublishedPostsByIds,
+  listPublishedPostsForAuthor,
   type PublishedPost,
 } from '@/lib/posts-store'
 
 export type TermLink = { slug: string; name: string }
 
-export type AuthorLink = { slug: string; display_name: string; bio: string | null }
+export type AuthorLink = {
+  slug: string
+  display_name: string
+  bio: string | null
+  title: string | null
+  company: string | null
+  location: string | null
+  linkedin_url: string | null
+}
 
-function currentWebsite(): PostWebsite {
-  return requirePostWebsite(process.env.POSTS_WEBSITE)
+const AUTHOR_COLUMN_ATTEMPTS = [
+  'user_id, slug, display_name, bio, linkedin_url, title, company, location',
+  'user_id, slug, display_name, bio, linkedin_url',
+  'user_id, slug, display_name, bio',
+] as const
+
+type AuthorProfileRow = {
+  user_id: string
+  slug: string
+  display_name: string
+  bio: string | null
+  linkedin_url?: string | null
+  title?: string | null
+  company?: string | null
+  location?: string | null
+}
+
+function toAuthorLink(row: AuthorProfileRow): AuthorLink {
+  return {
+    slug: row.slug,
+    display_name: row.display_name,
+    bio: row.bio,
+    title: row.title ?? null,
+    company: row.company ?? null,
+    location: row.location ?? null,
+    linkedin_url: row.linkedin_url ?? null,
+  }
+}
+
+async function selectAuthorRows(
+  label: string,
+  run: (columns: string) => Promise<{ data: AuthorProfileRow[] | null; error: { code?: string; message: string } | null }>
+): Promise<AuthorProfileRow[] | null> {
+  for (let index = 0; index < AUTHOR_COLUMN_ATTEMPTS.length; index += 1) {
+    const result = await run(AUTHOR_COLUMN_ATTEMPTS[index])
+    if (!result.error) return result.data ?? []
+    const last = index === AUTHOR_COLUMN_ATTEMPTS.length - 1
+    if (!isMissingBlogSchemaError(result.error) || last) {
+      const missing = emptyOnSchemaError(result.error, [] as AuthorProfileRow[], label)
+      return missing ?? null
+    }
+    logBlogSchemaGap(label, result.error)
+  }
+  return []
+}
+
+function readPublicWebsite(): PostWebsite | null {
+  return publicPostWebsite(process.env.POSTS_WEBSITE)
+}
+
+function emptyOnSchemaError<T>(
+  error: { code?: string; message: string } | null,
+  empty: T,
+  label: string
+): T | undefined {
+  if (!error) return undefined
+  if (isMissingBlogSchemaError(error)) {
+    logBlogSchemaGap(label, error)
+    return empty
+  }
+  throw new Error(error.message)
 }
 
 export function parseTermNames(value: unknown): string[] {
@@ -50,7 +126,8 @@ async function uniqueAuthorSlug(
       .eq('website', website)
       .eq('slug', candidate)
       .maybeSingle()
-    if (error) throw new Error(error.message)
+    const missing = emptyOnSchemaError(error, null, 'blog_author_profiles')
+    if (missing !== undefined) return candidate
     if (!data) return candidate
     const suffix = `-${n}`
     candidate = `${base.slice(0, 80 - suffix.length)}${suffix}`
@@ -66,7 +143,8 @@ export async function ensureAuthorProfile(userId: string, website: PostWebsite):
     .eq('website', website)
     .eq('user_id', userId)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  const missingProfile = emptyOnSchemaError(error, null, 'blog_author_profiles')
+  if (missingProfile !== undefined) return
   if (existing) return
 
   const { data: userData, error: userError } = await supabase
@@ -92,14 +170,18 @@ export async function ensureAuthorProfile(userId: string, website: PostWebsite):
     slug,
     display_name: displayName,
   })
-  if (insertError && insertError.code !== '23505') throw new Error(insertError.message)
+  if (insertError && insertError.code !== '23505') {
+    const missingInsert = emptyOnSchemaError(insertError, null, 'blog_author_profiles')
+    if (missingInsert !== undefined) return
+    throw new Error(insertError.message)
+  }
 }
 
 async function upsertTerm(
   table: 'blog_categories' | 'blog_tags',
   website: PostWebsite,
   name: string
-): Promise<string> {
+): Promise<string | null> {
   const supabase = await createSSRClient()
   const slug = slugifyTitle(name)
   const { data: existing, error } = await supabase
@@ -108,7 +190,8 @@ async function upsertTerm(
     .eq('website', website)
     .eq('slug', slug)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  const missing = emptyOnSchemaError(error, null, table)
+  if (missing !== undefined) return null
   if (existing) return existing.id
 
   const { data, error: insertError } = await supabase
@@ -117,6 +200,8 @@ async function upsertTerm(
     .select('id')
     .single()
   if (insertError) {
+    const missingInsert = emptyOnSchemaError(insertError, null, table)
+    if (missingInsert !== undefined) return null
     if (insertError.code === '23505') {
       const { data: again, error: againError } = await supabase
         .from(table)
@@ -144,34 +229,45 @@ export async function syncPostTerms(
 
   const categoryIds: string[] = []
   for (const name of categoryNames) {
-    categoryIds.push(await upsertTerm('blog_categories', website, name))
+    const id = await upsertTerm('blog_categories', website, name)
+    if (!id) return
+    categoryIds.push(id)
   }
   const tagIds: string[] = []
   for (const name of tagNames) {
-    tagIds.push(await upsertTerm('blog_tags', website, name))
+    const id = await upsertTerm('blog_tags', website, name)
+    if (!id) return
+    tagIds.push(id)
   }
 
   const { error: dropCategories } = await supabase
     .from('post_categories')
     .delete()
     .eq('post_id', postId)
+  const missingCategories = emptyOnSchemaError(dropCategories, null, 'post_categories')
+  if (missingCategories !== undefined) return
   if (dropCategories) throw new Error(dropCategories.message)
   if (categoryIds.length > 0) {
     const { error } = await supabase
       .from('post_categories')
       .insert(categoryIds.map((category_id) => ({ post_id: postId, category_id })))
-    if (error) throw new Error(error.message)
+    if (emptyOnSchemaError(error, null, 'post_categories') !== undefined) return
   }
 
   const { error: dropTags } = await supabase.from('post_tags').delete().eq('post_id', postId)
+  const missingTags = emptyOnSchemaError(dropTags, null, 'post_tags')
+  if (missingTags !== undefined) return
   if (dropTags) throw new Error(dropTags.message)
   if (tagIds.length > 0) {
     const { error } = await supabase
       .from('post_tags')
       .insert(tagIds.map((tag_id) => ({ post_id: postId, tag_id })))
-    if (error) throw new Error(error.message)
+    if (emptyOnSchemaError(error, null, 'post_tags') !== undefined) return
   }
 }
+
+const emptyTerms = { categories: [] as string[], tags: [] as string[] }
+const emptyTermLinks = { categories: [] as TermLink[], tags: [] as TermLink[] }
 
 export async function getPostTermNames(postId: string): Promise<{ categories: string[]; tags: string[] }> {
   const supabase = await createSSRClient()
@@ -179,47 +275,40 @@ export async function getPostTermNames(postId: string): Promise<{ categories: st
     .from('post_categories')
     .select('category_id')
     .eq('post_id', postId)
-  if (categoryError) throw new Error(categoryError.message)
+  const missingCategoryLinks = emptyOnSchemaError(categoryError, emptyTerms, 'post_categories')
+  if (missingCategoryLinks) return missingCategoryLinks
   const { data: tagLinks, error: tagError } = await supabase
     .from('post_tags')
     .select('tag_id')
     .eq('post_id', postId)
-  if (tagError) throw new Error(tagError.message)
+  const missingTagLinks = emptyOnSchemaError(tagError, emptyTerms, 'post_tags')
+  if (missingTagLinks) return missingTagLinks
 
   const categoryIds = (categoryLinks ?? []).map((row) => row.category_id)
   const tagIds = (tagLinks ?? []).map((row) => row.tag_id)
-  const categories =
+  const categoryRows =
     categoryIds.length === 0
-      ? []
-      : (
-          await supabase.from('blog_categories').select('name').in('id', categoryIds)
-        ).data?.map((row) => row.name) ?? []
-  const tags =
+      ? { data: [] as { name: string }[], error: null }
+      : await supabase.from('blog_categories').select('name').in('id', categoryIds)
+  if (emptyOnSchemaError(categoryRows.error, emptyTerms, 'blog_categories')) return emptyTerms
+  const tagRows =
     tagIds.length === 0
-      ? []
-      : (await supabase.from('blog_tags').select('name').in('id', tagIds)).data?.map((row) => row.name) ?? []
-  return { categories, tags }
+      ? { data: [] as { name: string }[], error: null }
+      : await supabase.from('blog_tags').select('name').in('id', tagIds)
+  if (emptyOnSchemaError(tagRows.error, emptyTerms, 'blog_tags')) return emptyTerms
+  return {
+    categories: categoryRows.data?.map((row) => row.name) ?? [],
+    tags: tagRows.data?.map((row) => row.name) ?? [],
+  }
 }
 
 async function livePostsByIds(ids: string[]): Promise<PublishedPost[]> {
-  if (ids.length === 0) return []
-  const website = currentWebsite()
-  const supabase = await createSSRClient()
-  const { data, error } = await supabase
-    .from('posts')
-    .select('id, website, type, title, slug, summary, body, cover_image_url, video_url, published_at, sort_order, author_id, updated_at')
-    .eq('website', website)
-    .eq('type', 'blog')
-    .eq('status', 'published')
-    .lte('published_at', new Date().toISOString())
-    .in('id', ids)
-    .order('published_at', { ascending: false })
-  if (error) throw new Error(error.message)
-  return (data ?? []) as PublishedPost[]
+  return listPublishedPostsByIds(ids)
 }
 
 export async function listPostsForCategory(slug: string): Promise<{ name: string; posts: PublishedPost[] } | null> {
-  const website = currentWebsite()
+  const website = readPublicWebsite()
+  if (!website) return null
   const supabase = await createSSRClient()
   const { data: category, error } = await supabase
     .from('blog_categories')
@@ -227,19 +316,22 @@ export async function listPostsForCategory(slug: string): Promise<{ name: string
     .eq('website', website)
     .eq('slug', slug)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  const missing = emptyOnSchemaError(error, null, 'blog_categories')
+  if (missing !== undefined) return missing
   if (!category) return null
   const { data: links, error: linkError } = await supabase
     .from('post_categories')
     .select('post_id')
     .eq('category_id', category.id)
-  if (linkError) throw new Error(linkError.message)
-  const posts = await livePostsByIds((links ?? []).map((row) => row.post_id))
+  const missingLinks = emptyOnSchemaError(linkError, [] as { post_id: string }[], 'post_categories')
+  const rows = missingLinks ?? links ?? []
+  const posts = await livePostsByIds(rows.map((row) => row.post_id))
   return { name: category.name, posts }
 }
 
 export async function listPostsForTag(slug: string): Promise<{ name: string; posts: PublishedPost[] } | null> {
-  const website = currentWebsite()
+  const website = readPublicWebsite()
+  if (!website) return null
   const supabase = await createSSRClient()
   const { data: tag, error } = await supabase
     .from('blog_tags')
@@ -247,67 +339,123 @@ export async function listPostsForTag(slug: string): Promise<{ name: string; pos
     .eq('website', website)
     .eq('slug', slug)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  const missing = emptyOnSchemaError(error, null, 'blog_tags')
+  if (missing !== undefined) return missing
   if (!tag) return null
   const { data: links, error: linkError } = await supabase
     .from('post_tags')
     .select('post_id')
     .eq('tag_id', tag.id)
-  if (linkError) throw new Error(linkError.message)
-  const posts = await livePostsByIds((links ?? []).map((row) => row.post_id))
+  const missingLinks = emptyOnSchemaError(linkError, [] as { post_id: string }[], 'post_tags')
+  const rows = missingLinks ?? links ?? []
+  const posts = await livePostsByIds(rows.map((row) => row.post_id))
   return { name: tag.name, posts }
 }
 
 export async function listPostsForAuthor(
   slug: string
 ): Promise<{ author: AuthorLink; posts: PublishedPost[] } | null> {
-  const website = currentWebsite()
+  const website = readPublicWebsite()
+  if (!website) return null
   const supabase = await createSSRClient()
-  const { data: author, error } = await supabase
-    .from('blog_author_profiles')
-    .select('user_id, slug, display_name, bio')
-    .eq('website', website)
-    .eq('slug', slug)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
+  const rows = await selectAuthorRows('blog_author_profiles', async (columns) => {
+    const { data, error } = await supabase
+      .from('blog_author_profiles')
+      .select(columns as 'user_id, slug, display_name, bio')
+      .eq('website', website)
+      .eq('slug', slug)
+      .maybeSingle()
+    return { data: data ? [data as AuthorProfileRow] : [], error }
+  })
+  const author = rows?.[0]
   if (!author) return null
-  const { data, error: postError } = await supabase
-    .from('posts')
-    .select('id, website, type, title, slug, summary, body, cover_image_url, video_url, published_at, sort_order, author_id, updated_at')
-    .eq('website', website)
-    .eq('type', 'blog')
-    .eq('status', 'published')
-    .eq('author_id', author.user_id)
-    .lte('published_at', new Date().toISOString())
-    .order('published_at', { ascending: false })
-  if (postError) throw new Error(postError.message)
-  return {
-    author: { slug: author.slug, display_name: author.display_name, bio: author.bio },
-    posts: (data ?? []) as PublishedPost[],
-  }
+  const posts = await listPublishedPostsForAuthor(author.user_id)
+  return { author: toAuthorLink(author), posts }
 }
 
 export async function listCategoryLinks(): Promise<TermLink[]> {
-  const website = currentWebsite()
+  const website = readPublicWebsite()
+  if (!website) return []
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('blog_categories')
     .select('slug, name')
     .eq('website', website)
     .order('name', { ascending: true })
-  if (error) throw new Error(error.message)
+  const missing = emptyOnSchemaError(error, [] as TermLink[], 'blog_categories')
+  if (missing) return missing
   return data ?? []
 }
 
+export async function listTagLinks(): Promise<TermLink[]> {
+  const website = readPublicWebsite()
+  if (!website) return []
+  const supabase = await createSSRClient()
+  const { data, error } = await supabase
+    .from('blog_tags')
+    .select('slug, name')
+    .eq('website', website)
+    .order('name', { ascending: true })
+  const missing = emptyOnSchemaError(error, [] as TermLink[], 'blog_tags')
+  if (missing) return missing
+  return data ?? []
+}
+
+export async function authorsForUserIds(userIds: string[]): Promise<Record<string, RollAuthor>> {
+  const unique = [...new Set(userIds.filter((id) => id.length > 0))]
+  if (unique.length === 0) return {}
+  const website = readPublicWebsite()
+  if (!website) return {}
+  const supabase = await createSSRClient()
+  const rows = await selectAuthorRows('blog_author_profiles', async (columns) => {
+    const { data, error } = await supabase
+      .from('blog_author_profiles')
+      .select(columns as 'user_id, slug, display_name, bio')
+      .eq('website', website)
+      .in('user_id', unique)
+    return { data: (data as AuthorProfileRow[] | null) ?? [], error }
+  })
+  const map: Record<string, RollAuthor> = {}
+  for (const row of rows ?? []) {
+    map[row.user_id] = {
+      slug: row.slug,
+      displayName: row.display_name,
+      title: row.title ?? null,
+      company: row.company ?? null,
+    }
+  }
+  return map
+}
+
+export async function newsletterBlockAvailable(): Promise<boolean> {
+  try {
+    const { createServerAdminClient } = await import('@/lib/supabase/serverAdminClient')
+    const admin = await createServerAdminClient()
+    const { error } = await admin.from('newsletter_subscribers').select('email').limit(1)
+    if (!error) return true
+    if (isMissingBlogSchemaError(error)) {
+      logBlogSchemaGap('newsletter_subscribers', error)
+      return false
+    }
+    console.warn(`newsletter probe: ${error.code ?? ''} ${error.message}`.trim())
+    return false
+  } catch (error) {
+    console.warn('newsletter probe:', error instanceof Error ? error.message : error)
+    return false
+  }
+}
+
 export async function listAuthorLinks(): Promise<TermLink[]> {
-  const website = currentWebsite()
+  const website = readPublicWebsite()
+  if (!website) return []
   const supabase = await createSSRClient()
   const { data, error } = await supabase
     .from('blog_author_profiles')
     .select('slug, display_name')
     .eq('website', website)
     .order('display_name', { ascending: true })
-  if (error) throw new Error(error.message)
+  const missing = emptyOnSchemaError(error, [] as TermLink[], 'blog_author_profiles')
+  if (missing) return missing
   return (data ?? []).map((row) => ({ slug: row.slug, name: row.display_name }))
 }
 
@@ -317,38 +465,45 @@ export async function termsForPost(postId: string): Promise<{ categories: TermLi
     .from('post_categories')
     .select('category_id')
     .eq('post_id', postId)
-  if (categoryError) throw new Error(categoryError.message)
+  const missingCategoryLinks = emptyOnSchemaError(categoryError, emptyTermLinks, 'post_categories')
+  if (missingCategoryLinks) return missingCategoryLinks
   const { data: tagLinks, error: tagError } = await supabase
     .from('post_tags')
     .select('tag_id')
     .eq('post_id', postId)
-  if (tagError) throw new Error(tagError.message)
+  const missingTagLinks = emptyOnSchemaError(tagError, emptyTermLinks, 'post_tags')
+  if (missingTagLinks) return missingTagLinks
   const categoryIds = (categoryLinks ?? []).map((row) => row.category_id)
   const tagIds = (tagLinks ?? []).map((row) => row.tag_id)
-  const categories =
+  const categoryRows =
     categoryIds.length === 0
-      ? []
-      : (
-          await supabase.from('blog_categories').select('slug, name').in('id', categoryIds)
-        ).data ?? []
-  const tags =
-    tagIds.length === 0 ? [] : (await supabase.from('blog_tags').select('slug, name').in('id', tagIds)).data ?? []
-  return { categories, tags }
+      ? { data: [] as TermLink[], error: null }
+      : await supabase.from('blog_categories').select('slug, name').in('id', categoryIds)
+  if (emptyOnSchemaError(categoryRows.error, emptyTermLinks, 'blog_categories')) return emptyTermLinks
+  const tagRows =
+    tagIds.length === 0
+      ? { data: [] as TermLink[], error: null }
+      : await supabase.from('blog_tags').select('slug, name').in('id', tagIds)
+  if (emptyOnSchemaError(tagRows.error, emptyTermLinks, 'blog_tags')) return emptyTermLinks
+  return { categories: categoryRows.data ?? [], tags: tagRows.data ?? [] }
 }
 
 export async function authorForPost(authorId: string | null): Promise<AuthorLink | null> {
   if (!authorId) return null
-  const website = currentWebsite()
+  const website = readPublicWebsite()
+  if (!website) return null
   const supabase = await createSSRClient()
-  const { data, error } = await supabase
-    .from('blog_author_profiles')
-    .select('slug, display_name, bio')
-    .eq('website', website)
-    .eq('user_id', authorId)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  if (!data) return null
-  return data
+  const rows = await selectAuthorRows('blog_author_profiles', async (columns) => {
+    const { data, error } = await supabase
+      .from('blog_author_profiles')
+      .select(columns as 'user_id, slug, display_name, bio')
+      .eq('website', website)
+      .eq('user_id', authorId)
+      .maybeSingle()
+    return { data: data ? [data as AuthorProfileRow] : [], error }
+  })
+  const row = rows?.[0]
+  return row ? toAuthorLink(row) : null
 }
 
 export async function listRelatedPosts(postId: string): Promise<PublishedPost[]> {
@@ -357,15 +512,15 @@ export async function listRelatedPosts(postId: string): Promise<PublishedPost[]>
     .from('post_categories')
     .select('category_id')
     .eq('post_id', postId)
-  if (error) throw new Error(error.message)
-  const categoryIds = (links ?? []).map((row) => row.category_id)
-  if (categoryIds.length > 0) {
+  const missingLinks = emptyOnSchemaError(error, [] as { category_id: string }[], 'post_categories')
+  const categoryIds = (missingLinks ?? links ?? []).map((row) => row.category_id)
+  if (missingLinks === undefined && categoryIds.length > 0) {
     const { data: siblings, error: siblingError } = await supabase
       .from('post_categories')
       .select('post_id')
       .in('category_id', categoryIds)
-    if (siblingError) throw new Error(siblingError.message)
-    const ids = [...new Set((siblings ?? []).map((row) => row.post_id).filter((id) => id !== postId))]
+    const missingSiblings = emptyOnSchemaError(siblingError, [] as { post_id: string }[], 'post_categories')
+    const ids = [...new Set((missingSiblings ?? siblings ?? []).map((row) => row.post_id).filter((id) => id !== postId))]
     const related = (await livePostsByIds(ids)).slice(0, 3)
     if (related.length > 0) return related
   }

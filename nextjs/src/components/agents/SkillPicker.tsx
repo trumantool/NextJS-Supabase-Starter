@@ -13,15 +13,15 @@ export function SkillPicker({
   onChange: (ids: string[]) => void
   sharedOnly?: boolean
 }) {
-  const visible = sharedOnly ? skills.filter((s) => s.user_id === null) : skills
+  const visible = (sharedOnly ? skills.filter((s) => s.user_id === null) : skills.filter((s) => s.user_id !== null))
   const selectedSet = new Set(selected)
 
   if (visible.length === 0) {
     return (
       <p className="text-sm text-gray-500">
         {sharedOnly
-          ? 'No shared skills yet. Admins can upload them in Skills.'
-          : 'No skills yet. Upload one in Skills, then attach it here.'}
+          ? 'Shared catalog skills are hidden.'
+          : 'No personal skills yet. Upload one in Skills, then attach it here. Built-in Task Management files stay on that agent and are not listed here.'}
       </p>
     )
   }
@@ -45,9 +45,7 @@ export function SkillPicker({
               />
               <span>
                 <span className="font-medium text-gray-900">{skill.skill_name}</span>
-                <span className="ml-2 text-xs text-gray-400">
-                  {skill.user_id ? 'Mine' : 'Shared'}
-                </span>
+                <span className="ml-2 text-xs text-gray-400">Mine</span>
                 {skill.skill_description ? (
                   <span className="block text-gray-500">{skill.skill_description}</span>
                 ) : null}

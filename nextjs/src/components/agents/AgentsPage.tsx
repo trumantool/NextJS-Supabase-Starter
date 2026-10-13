@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { modelIdFromDefaults } from '@/lib/agent-templates'
+import { builtinKeyFromDefaults } from '@/lib/starter-catalog-allowlist'
 import type { UserAgent } from '@/lib/types'
 
 export default function AgentsPage() {
@@ -59,13 +60,11 @@ export default function AgentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Agents</h1>
           <p className="text-sm text-gray-500">
-            Your OpenRouter agents. Attach skills, then open Chat and switch to an agent.
+            Your agents. Attach personal skills, then open Chat and switch to an agent.
+            Plain General chat does not use those skills.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/agent-templates">Browse templates</Link>
-          </Button>
           <Button onClick={() => void createBlank()} disabled={creating}>
             <Plus className="h-4 w-4" />
             {creating ? 'Creating…' : 'New agent'}
@@ -88,14 +87,12 @@ export default function AgentsPage() {
           <CardHeader>
             <CardTitle>No agents yet</CardTitle>
             <CardDescription>
-              Clone the Starter Assistant, or create a blank agent and attach skills.
+              Create a blank agent and attach your own skills, or pick General agent or Task
+              Management from Chat.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex gap-3">
-            <Button asChild>
-              <Link href="/agent-templates">Use a template</Link>
-            </Button>
-            <Button variant="outline" onClick={() => void createBlank()} disabled={creating}>
+            <Button onClick={() => void createBlank()} disabled={creating}>
               Create blank
             </Button>
           </CardContent>
@@ -113,9 +110,11 @@ export default function AgentsPage() {
                 <span className="font-medium text-gray-900 truncate">{agent.name}</span>
               </div>
               <p className="mt-2 text-xs text-gray-500">
-                {agent.source_template_name
-                  ? `From ${agent.source_template_name}`
-                  : 'Custom'}
+                {builtinKeyFromDefaults(agent.defaults)
+                  ? 'Built-in'
+                  : agent.source_template_name
+                    ? `From ${agent.source_template_name}`
+                    : 'Custom'}
                 {' · '}
                 {agent.skill_ids.length} skill{agent.skill_ids.length === 1 ? '' : 's'}
                 {' · '}

@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { modelIdFromDefaults } from '@/lib/agent-templates'
+import { builtinAgentByKey } from '@/lib/builtin-agents'
+import { taskManagementSkillPrompt } from '@/lib/builtin-skill-files'
+import { completeWithTaskTools } from '@/lib/chat-task-tools'
 import {
   buildAssistantContent,
   buildUserContent,
@@ -13,6 +16,7 @@ import {
 import { getValidChatModel, streamChatCompletion } from '@/lib/chat-openrouter'
 import { recordLlmTurnUsage } from '@/lib/llm-usage'
 import { loadAgentSkills } from '@/lib/load-agent-skills'
+import { builtinKeyFromDefaults, isUserAgentVisible } from '@/lib/starter-catalog-allowlist'
 import { isUuid } from '@/lib/ids'
 import { createSSRClient } from '@/lib/supabase/server'
 
@@ -72,6 +76,7 @@ export async function POST(request: NextRequest) {
 
     let systemPrompt = DEFAULT_SYSTEM_PROMPT
     let modelId = getValidChatModel(body.modelId, chat.model_id)
+    let useTaskTools = false
 
     const boundAgentId = chat.agent_id
     if (boundAgentId) {
@@ -83,7 +88,7 @@ export async function POST(request: NextRequest) {
       }
       const { data: agent, error: agentError } = await supabase
         .from('user_agents')
-        .select('id, name, system_prompt, skill_ids, defaults')
+        .select('id, name, system_prompt, skill_ids, defaults, source_template_id, source_template_name, user_id')
         .eq('id', boundAgentId)
         .eq('user_id', user.id)
         .maybeSingle()
@@ -92,8 +97,24 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Bound agent was not found.' }, { status: 404 })
       }
 
-      const agentPrompt = agent.system_prompt?.trim()
-      if (agentPrompt) systemPrompt = agentPrompt
+      if (!isUserAgentVisible(agent)) {
+        return NextResponse.json({ error: 'This agent is not available.' }, { status: 403 })
+      }
+
+      const builtinKey = builtinKeyFromDefaults(agent.defaults)
+      if (builtinKey) {
+        const spec = builtinAgentByKey(builtinKey)
+        const stored = agent.system_prompt?.trim()
+        systemPrompt = stored || spec.systemPrompt
+        if (builtinKey === 'task-management') {
+          systemPrompt += taskManagementSkillPrompt()
+          useTaskTools = true
+        }
+      } else {
+        const agentPrompt = agent.system_prompt?.trim()
+        if (agentPrompt) systemPrompt = agentPrompt
+      }
+
       if (!isModelIdProvided(body.modelId)) {
         modelId = getValidChatModel(modelIdFromDefaults(agent.defaults), modelId)
       }
@@ -172,12 +193,28 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
         }
         try {
-          const result = await streamChatCompletion({
-            model: modelId,
-            messages: openrouterMessages,
-            onChunk: (delta) => send({ delta }),
-            userId: user.id,
-          })
+          const result = useTaskTools
+            ? await completeWithTaskTools({
+                supabase,
+                userId: user.id,
+                model: modelId,
+                messages: openrouterMessages,
+                onChunk: (delta) => send({ delta }),
+              }).catch(async (toolError) => {
+                console.error('Task tools unavailable, streaming without tools:', toolError)
+                return streamChatCompletion({
+                  model: modelId,
+                  messages: openrouterMessages,
+                  onChunk: (delta) => send({ delta }),
+                  userId: user.id,
+                })
+              })
+            : await streamChatCompletion({
+                model: modelId,
+                messages: openrouterMessages,
+                onChunk: (delta) => send({ delta }),
+                userId: user.id,
+              })
           const { data: saved, error: insertAssistantError } = await supabase
             .from('messages')
             .insert({

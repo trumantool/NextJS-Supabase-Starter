@@ -1,5 +1,6 @@
-import { listPublishedPosts } from '@/lib/posts-store'
 import { publicSiteOrigin, xmlEscape } from '@/lib/blog-seo'
+import { settlePublicBlog } from '@/lib/posts'
+import { listPublishedPosts } from '@/lib/posts-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export async function GET() {
     })
   }
 
-  const posts = await listPublishedPosts()
+  const posts = await settlePublicBlog('rss', () => listPublishedPosts(), [])
   const items = posts
     .map((post) => {
       const link = `${origin}/posts/${post.slug}`
@@ -23,7 +24,7 @@ export async function GET() {
     })
     .join('')
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Posts</title><link>${xmlEscape(
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Blog</title><link>${xmlEscape(
     `${origin}/posts`
   )}</link><description>Published posts</description>${items}</channel></rss>`
 

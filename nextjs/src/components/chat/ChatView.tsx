@@ -8,8 +8,13 @@ import ChatComposer from '@/components/chat/ChatComposer'
 import ChatHistorySidebar from '@/components/chat/ChatHistorySidebar'
 import MessageItem from '@/components/chat/MessageItem'
 import { CHAT_AGENT_QUERY, chatPathForAgent, chatsListPath, parseChatAgentQueryParam } from '@/lib/chat-agent'
+import {
+  GENERAL_AGENT_VALUE,
+  TASK_MANAGEMENT_VALUE,
+} from '@/components/chat/AgentSwitcher'
 import type { ChatThread } from '@/lib/chat-types'
 import { DEFAULT_AGENT_MODEL, modelIdFromDefaults } from '@/lib/agent-templates'
+import { builtinKeyFromDefaults, type BuiltinAgentKey } from '@/lib/starter-catalog-allowlist'
 import {
   buildAssistantContent,
   buildUserContent,
@@ -57,6 +62,7 @@ function ChatViewInner({ initialChat = null, initialMessages = [] }: ChatViewPro
   const router = useRouter()
   const searchParams = useSearchParams()
   const urlAgentId = parseChatAgentQueryParam(searchParams.get(CHAT_AGENT_QUERY))
+  const builtinParam = searchParams.get('builtin')
 
   const [agents, setAgents] = useState<UserAgent[]>([])
   const [chats, setChats] = useState<ChatThread[]>([])
@@ -75,6 +81,7 @@ function ChatViewInner({ initialChat = null, initialMessages = [] }: ChatViewPro
     () => agents.find((agent) => agent.id === agentId) || null,
     [agents, agentId]
   )
+  const selectedBuiltin = selectedAgent ? builtinKeyFromDefaults(selectedAgent.defaults) : null
 
   const loadAgents = useCallback(async () => {
     const res = await fetch('/api/agents', { cache: 'no-store' })
@@ -130,8 +137,48 @@ function ChatViewInner({ initialChat = null, initialMessages = [] }: ChatViewPro
     bottomRef.current?.scrollIntoView({ block: 'end' })
   }, [messages, generating])
 
+  const ensureBuiltin = useCallback(async (key: BuiltinAgentKey): Promise<string> => {
+    const res = await fetch('/api/agents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ builtin: key }),
+    })
+    const json = (await res.json()) as { agent?: UserAgent; error?: string }
+    if (!res.ok || !json.agent) {
+      throw new Error(json.error || 'Failed to open that agent')
+    }
+    setAgents((prev) => {
+      if (prev.some((agent) => agent.id === json.agent!.id)) return prev
+      return [json.agent!, ...prev]
+    })
+    return json.agent.id
+  }, [])
+
+  useEffect(() => {
+    if (builtinParam !== 'general' && builtinParam !== 'task-management') return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const id = await ensureBuiltin(builtinParam)
+        if (!cancelled) router.replace(chatPathForAgent(id))
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to open that agent')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [builtinParam, ensureBuiltin, router])
+
   const changeAgent = (next: string | null) => {
     if (generating) return
+    if (next === GENERAL_AGENT_VALUE || next === TASK_MANAGEMENT_VALUE) {
+      const key: BuiltinAgentKey = next === GENERAL_AGENT_VALUE ? 'general' : 'task-management'
+      void ensureBuiltin(key)
+        .then((id) => router.push(chatPathForAgent(id)))
+        .catch((err) => setError(err instanceof Error ? err.message : 'Failed to open that agent'))
+      return
+    }
     router.push(chatPathForAgent(next))
   }
 
@@ -326,12 +373,22 @@ function ChatViewInner({ initialChat = null, initialMessages = [] }: ChatViewPro
         <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
           <div>
             <h1 className="text-lg font-semibold text-gray-900">
-              {selectedAgent ? `Chat with ${selectedAgent.name}` : 'Chat'}
+              {selectedBuiltin === 'general'
+                ? 'General agent'
+                : selectedBuiltin === 'task-management'
+                  ? 'Task Management'
+                  : selectedAgent
+                    ? `Chat with ${selectedAgent.name}`
+                    : 'Chat'}
             </h1>
             <p className="text-xs text-gray-500">
-              {selectedAgent
-                ? 'This thread uses the selected agent’s prompt, model, and skills. History is only for this agent.'
-                : 'General chat is not bound to an agent. Attach a skill-enabled agent anytime from the switcher.'}
+              {selectedBuiltin === 'task-management'
+                ? 'Built-in task skills are always on. Personal skills on this agent are added too.'
+                : selectedBuiltin === 'general'
+                  ? 'General agent loads the skills saved on this row. Plain General (the empty option) does not.'
+                  : selectedAgent
+                    ? 'This thread uses the selected agent’s prompt, model, and personal skills.'
+                    : 'General chat is not bound to an agent and does not load skills.'}
             </p>
           </div>
           <AgentSwitcher
@@ -354,14 +411,20 @@ function ChatViewInner({ initialChat = null, initialMessages = [] }: ChatViewPro
             <div className="mx-auto max-w-2xl space-y-6 text-center">
               <div>
                 <h2 className="text-2xl font-semibold text-gray-900">
-                  {selectedAgent
-                    ? `Chat with ${selectedAgent.name}`
-                    : 'What can I help you with?'}
+                  {selectedBuiltin === 'general'
+                    ? 'General agent'
+                    : selectedBuiltin === 'task-management'
+                      ? 'Task Management'
+                      : selectedAgent
+                        ? `Chat with ${selectedAgent.name}`
+                        : 'What can I help you with?'}
                 </h2>
                 <p className="mt-2 text-sm text-gray-500">
-                  {selectedAgent
-                    ? 'Ask anything. Attached skills are added as system context for this agent.'
-                    : 'Start a general thread, or switch to one of your agents to use its skills.'}
+                  {selectedBuiltin === 'task-management'
+                    ? 'Ask it to list, create, complete, or delete your to-dos.'
+                    : selectedAgent
+                      ? 'Ask anything. Personal skills on this agent are added as system context.'
+                      : 'This is plain General chat. It does not load skills from General agent.'}
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">

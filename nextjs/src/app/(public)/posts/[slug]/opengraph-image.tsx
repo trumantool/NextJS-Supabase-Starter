@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og'
+import { settlePublicBlog } from '@/lib/posts'
 import { getPublishedPostBySlug } from '@/lib/posts-store'
 
 export const runtime = 'nodejs'
@@ -10,7 +11,7 @@ type ImageProps = { params: Promise<{ slug: string }> }
 
 export default async function OpenGraphImage({ params }: ImageProps) {
   const { slug } = await params
-  const post = await getPublishedPostBySlug(slug)
+  const post = await settlePublicBlog('open graph', () => getPublishedPostBySlug(slug), null)
   const title = post?.title ?? 'Post'
 
   return new ImageResponse(

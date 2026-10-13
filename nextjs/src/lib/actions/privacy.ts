@@ -1,11 +1,15 @@
 'use server'
 
 import { createSSRClient } from '@/lib/supabase/server'
+import { createServerAdminClient } from '@/lib/supabase/serverAdminClient'
 import { Tables } from '@/lib/types'
+import { ADMIN_SETTINGS_COLUMNS, filterByAdminSettingsAppKey } from '@/lib/admin-settings-scope'
 import {
-  omitSecretAdminSettings,
-  publicAdminSettingNames,
-} from '@/lib/admin-setting-secrets'
+  configuredAdminSettingsAppKey,
+  dropConcealedAdminSettings,
+  requireCurrentUserAdmin,
+  upsertScopedAdminSetting,
+} from '@/lib/admin-settings-server'
 
 type AdminSetting = Tables<'admin_settings'>
 
@@ -17,27 +21,32 @@ type AdminSetting = Tables<'admin_settings'>
 export async function getPrivacySettings(): Promise<AdminSetting[]> {
   const supabase = await createSSRClient()
 
-  const { data, error } = await supabase
-    .from('admin_settings')
-    .select('*')
-    .in('option_name', publicAdminSettingNames([
-      'privacy_policy',
-      'site_title',
-      'company_name',
-      'support_email',
-      'site_tagline',
-      'contact_address',
-      'support_hours',
-      'phone_number',
-    ]))
-    .neq('option_field_type', 'secret')
+  const scoped = filterByAdminSettingsAppKey(
+    supabase
+      .from('admin_settings')
+      .select(ADMIN_SETTINGS_COLUMNS)
+      .in('option_name', [
+        'privacy_policy',
+        'site_title',
+        'company_name',
+        'support_email',
+        'site_tagline',
+        'contact_address',
+        'support_hours',
+        'phone_number',
+      ])
+      .neq('option_field_type', 'secret')
+      .neq('option_field_type', 'password'),
+    configuredAdminSettingsAppKey()
+  )
+  const { data, error } = await scoped
 
   if (error) {
     console.error('Failed to load privacy settings:', error)
     throw new Error('Failed to load privacy settings')
   }
 
-  return omitSecretAdminSettings((data ?? []) as AdminSetting[])
+  return dropConcealedAdminSettings((data ?? []) as AdminSetting[])
 }
 
 /**
@@ -46,28 +55,25 @@ export async function getPrivacySettings(): Promise<AdminSetting[]> {
 export async function updatePrivacyPolicy(
   content: string
 ): Promise<AdminSetting> {
-  const supabase = await createSSRClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
+  await requireCurrentUserAdmin()
 
-  const { data: userData } = await supabase
-    .from('user_data')
-    .select('user_role')
-    .eq('user_id', user.id)
-    .maybeSingle()
-  if (userData?.user_role !== 'admin') {
-    throw new Error('Forbidden: admin access required')
-  }
+  const appKey = configuredAdminSettingsAppKey()
+  const admin = await createServerAdminClient()
+  const existingQuery = filterByAdminSettingsAppKey(
+    admin.from('admin_settings').select(ADMIN_SETTINGS_COLUMNS).eq('option_name', 'privacy_policy'),
+    appKey
+  )
+  const { data: existing, error: readError } = await existingQuery.maybeSingle()
+  if (readError) throw new Error(readError.message)
+  if (!existing) throw new Error('Setting not found')
 
-  const { data, error } = await supabase
-    .from('admin_settings')
-    .update({ option_value: content, updated_at: new Date().toISOString() })
-    .eq('option_name', 'privacy_policy')
-    .select()
-    .single()
-
-  if (error) throw new Error(error.message)
-  return data as AdminSetting
+  const saved = await upsertScopedAdminSetting({
+    option_name: existing.option_name,
+    option_value: content,
+    option_field_type: existing.option_field_type,
+    option_title: existing.option_title,
+    option_description: existing.option_description,
+    updated_at: new Date().toISOString(),
+  })
+  return saved as AdminSetting
 }
